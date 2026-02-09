@@ -9,7 +9,6 @@ from gemini_service import procesar_voz_completo
 
 # --- CONFIGURACIÓN DE HORA ARGENTINA ---
 def obtener_fecha_hora():
-    # Ajuste para Argentina UTC-3
     ahora_utc = datetime.datetime.now(datetime.timezone.utc)
     return ahora_utc - datetime.timedelta(hours=3)
 
@@ -22,26 +21,25 @@ def cargar_json(ruta):
         return []
     except: return []
 
+# --- FUNCIÓN PDF CORREGIDA PARA 0 KB ---
 def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, metodo):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
+    pdf.set_font("Helvetica", "B", 16) # Helvetica es más estándar
     pdf.cell(0, 10, "MORITA MINIMERCADO", ln=True, align="C")
     
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font("Helvetica", "", 10)
     ahora = obtener_fecha_hora()
     pdf.cell(0, 5, f"FECHA: {ahora.strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
     pdf.cell(0, 5, f"CAJERO: {vendedor}", ln=True, align="C")
     pdf.ln(5)
     
-    # Encabezados de tabla
-    pdf.set_font("Arial", "B", 10)
+    pdf.set_font("Helvetica", "B", 10)
     pdf.cell(100, 8, "Producto", border=1)
     pdf.cell(20, 8, "Cant.", border=1)
     pdf.cell(35, 8, "Subtotal", border=1, ln=True)
     
-    # Productos
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font("Helvetica", "", 10)
     for item in carrito:
         c_v = f"{item['Cantidad']:g}"
         pdf.cell(100, 8, str(item['Producto']), border=1)
@@ -49,15 +47,13 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         pdf.cell(35, 8, f"${item['Subtotal']:,.0f}", border=1, ln=True)
     
     pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
+    pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
     
-    # --- CORRECCIÓN CLAVE ---
-    # Convertimos el PDF a una cadena de bytes compatible con Streamlit
-    return pdf.output()
+    # IMPORTANTE: Generar los bytes y forzar el formato binario
+    return bytes(pdf.output())
 
 def mostrar_caja():
-    # --- MEJORA VISUAL: Ocultar "Press Enter to apply" y etiquetas extra ---
     st.markdown("""
         <style>
             div[data-testid="InputInstructions"] { display: none; }
@@ -108,8 +104,7 @@ def mostrar_caja():
             coincidencias = [p for p in inv if busq in str(p['Producto']).upper()]
             for p in coincidencias:
                 cx, cy, cz = st.columns([2, 1, 0.5])
-                cx.write(f"**{p['Producto']}** (${p['Precio']:,.0f})")
-                # label_visibility="collapsed" quita el texto "Cant." que molesta
+                cx.write(f"**{p['Producto']}**")
                 cant_m = cy.number_input("Cant.", min_value=0.1, value=1.0, key=f"m_{p['Producto']}", label_visibility="collapsed")
                 if cz.button("➕", key=f"b_{p['Producto']}"):
                     st.session_state.carrito.append({
@@ -152,6 +147,7 @@ def mostrar_caja():
             if metodo == "Transferencia" or metodo == "Ambos":
                 st.write(f"**Transferencia:** ${p_tra:,.0f}")
 
+            # BOTÓN FINALIZAR
             if st.button("✅ FINALIZAR VENTA", use_container_width=True):
                 ahora = obtener_fecha_hora()
                 ventas = cargar_json("data/ventas_diarias.json")
@@ -167,45 +163,43 @@ def mostrar_caja():
                 with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                     json.dump(ventas, f, indent=4)
                 
-                # Generar ticket
+                # Generamos los bytes del PDF y los guardamos en session_state
                 st.session_state.ticket_ready = generar_ticket_pdf(st.session_state.carrito, total, st.session_state.usuario_data['nombre'], p_efe, p_tra, vuelto, metodo)
                 st.success("Venta Registrada")
 
+            # --- BOTONES DE ACCIÓN (TICKET Y NUEVA VENTA) ---
             if "ticket_ready" in st.session_state:
                 st.download_button(
-                    label="🖨️ TICKET", 
+                    label="🖨️ DESCARGAR TICKET", 
                     data=st.session_state.ticket_ready, 
                     file_name=f"ticket_{datetime.datetime.now().strftime('%H%M%S')}.pdf", 
-                    mime="application/pdf", # Esto asegura que no se descargue vacío
+                    mime="application/pdf",
                     use_container_width=True
                 )
-    # --- HISTORIAL GENERAL Y CIERRE (ADMIN) ---
+                
+                if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="secondary"):
+                    st.session_state.carrito = []
+                    if "ticket_ready" in st.session_state:
+                        del st.session_state.ticket_ready
+                    st.rerun()
+
+    # --- HISTORIAL ADMIN ---
     if st.session_state.get('rol') == "admin":
         st.divider()
         st.subheader("📅 HISTORIAL Y CIERRE (ADMIN)")
         v_hist = cargar_json("data/ventas_diarias.json")
         if v_hist:
             df = pd.DataFrame(v_hist)
-            
             if st.checkbox("Ver detalle productos"):
                 items_cierre = []
                 for v in v_hist:
                     for d in v['detalle']:
                         items_cierre.append({
-                            "Fecha": v['fecha'],
-                            "Producto": d['Producto'],
-                            "Cant": f"{d['Cantidad']:g}", 
-                            "Subtotal": f"${d['Subtotal']:,.0f}"
+                            "Fecha": v['fecha'], "Producto": d['Producto'],
+                            "Cant": f"{d['Cantidad']:g}", "Subtotal": f"${d['Subtotal']:,.0f}"
                         })
                 st.table(pd.DataFrame(items_cierre).tail(20))
             
             df_ver = df[['fecha', 'hora', 'vendedor', 'total', 'metodo']].copy()
             df_ver['total'] = df_ver['total'].apply(lambda x: f"${x:,.0f}")
             st.dataframe(df_ver.tail(20), use_container_width=True)
-            
-            c_m1, c_m2 = st.columns(2)
-            c_m1.metric("TOTAL HISTÓRICO", f"${df['total'].sum():,.0f}")
-            ahora = obtener_fecha_hora()
-            mes_actual = ahora.strftime("%Y-%m")
-            total_mes = df[df['mes'] == mes_actual]['total'].sum() if 'mes' in df.columns else 0
-            c_m2.metric(f"VENTA MES ({mes_actual})", f"${total_mes:,.0f}")
