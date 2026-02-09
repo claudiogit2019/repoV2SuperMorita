@@ -21,11 +21,11 @@ def cargar_json(ruta):
         return []
     except: return []
 
-# --- FUNCIÓN PDF CORREGIDA PARA 0 KB ---
+# --- CORRECCIÓN DEFINITIVA PDF ---
 def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, metodo):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16) # Helvetica es más estándar
+    pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, "MORITA MINIMERCADO", ln=True, align="C")
     
     pdf.set_font("Helvetica", "", 10)
@@ -50,8 +50,8 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
     
-    # IMPORTANTE: Generar los bytes y forzar el formato binario
-    return bytes(pdf.output())
+    # El método output() sin argumentos devuelve los bytes necesarios para Streamlit
+    return pdf.output()
 
 def mostrar_caja():
     st.markdown("""
@@ -163,11 +163,11 @@ def mostrar_caja():
                 with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                     json.dump(ventas, f, indent=4)
                 
-                # Generamos los bytes del PDF y los guardamos en session_state
+                # GENERACIÓN DE PDF (Sin bytes() adicional)
                 st.session_state.ticket_ready = generar_ticket_pdf(st.session_state.carrito, total, st.session_state.usuario_data['nombre'], p_efe, p_tra, vuelto, metodo)
                 st.success("Venta Registrada")
 
-            # --- BOTONES DE ACCIÓN (TICKET Y NUEVA VENTA) ---
+            # BOTONES POST-VENTA
             if "ticket_ready" in st.session_state:
                 st.download_button(
                     label="🖨️ DESCARGAR TICKET", 
@@ -177,7 +177,7 @@ def mostrar_caja():
                     use_container_width=True
                 )
                 
-                if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="secondary"):
+                if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="primary"):
                     st.session_state.carrito = []
                     if "ticket_ready" in st.session_state:
                         del st.session_state.ticket_ready
