@@ -9,10 +9,9 @@ from gemini_service import procesar_voz_completo
 
 # --- CONFIGURACIÓN DE HORA ARGENTINA ---
 def obtener_fecha_hora():
-    # Sumamos o restamos horas según el servidor (Streamlit suele usar UTC)
-    # Para Argentina es UTC-3
-    ahora = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=3)
-    return ahora
+    # Ajuste para Argentina UTC-3
+    ahora_utc = datetime.datetime.now(datetime.timezone.utc)
+    return ahora_utc - datetime.timedelta(hours=3)
 
 def cargar_json(ruta):
     try:
@@ -49,9 +48,18 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
-    return bytes(pdf.output(dest='S'))
+    # Corrección para FPDF2 en Streamlit
+    return pdf.output()
 
 def mostrar_caja():
+    # --- MEJORA VISUAL: Ocultar "Press Enter to apply" y etiquetas extra ---
+    st.markdown("""
+        <style>
+            div[data-testid="InputInstructions"] { display: none; }
+            div[data-testid="stMetricValue"] { font-size: 25px; }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.title("🛒 CAJA Y CONSULTAS")
     inv = cargar_json("data/inventario.json")
     if 'carrito' not in st.session_state: st.session_state.carrito = []
@@ -96,7 +104,8 @@ def mostrar_caja():
             for p in coincidencias:
                 cx, cy, cz = st.columns([2, 1, 0.5])
                 cx.write(f"**{p['Producto']}** (${p['Precio']:,.0f})")
-                cant_m = cy.number_input("Cant.", min_value=0.1, value=1.0, key=f"m_{p['Producto']}")
+                # label_visibility="collapsed" quita el texto "Cant." que molesta
+                cant_m = cy.number_input("Cant.", min_value=0.1, value=1.0, key=f"m_{p['Producto']}", label_visibility="collapsed")
                 if cz.button("➕", key=f"b_{p['Producto']}"):
                     st.session_state.carrito.append({
                         "Producto": p['Producto'], "Precio": p['Precio'], 
@@ -130,7 +139,6 @@ def mostrar_caja():
                 c1, c2 = st.columns(2); p_efe = c1.number_input("Efe:"); p_tra = c2.number_input("Transf:")
                 vuelto = max(0.0, (p_efe + p_tra) - total)
 
-            # --- VISTA DE PAGO SOLICITADA ---
             st.divider()
             st.markdown(f"### TOTAL: ${total:,.0f}")
             if metodo != "Transferencia":
@@ -154,6 +162,7 @@ def mostrar_caja():
                 with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                     json.dump(ventas, f, indent=4)
                 
+                # Generar ticket
                 st.session_state.ticket_ready = generar_ticket_pdf(st.session_state.carrito, total, st.session_state.usuario_data['nombre'], p_efe, p_tra, vuelto, metodo)
                 st.success("Venta Registrada")
 
@@ -177,8 +186,8 @@ def mostrar_caja():
                         items_cierre.append({
                             "Fecha": v['fecha'],
                             "Producto": d['Producto'],
-                            "Cant": f"{d['Cantidad']:g}", # Limpia el 1.0000 -> 1
-                            "Subtotal": d['Subtotal']
+                            "Cant": f"{d['Cantidad']:g}", 
+                            "Subtotal": f"${d['Subtotal']:,.0f}"
                         })
                 st.table(pd.DataFrame(items_cierre).tail(20))
             
