@@ -21,25 +21,25 @@ def cargar_json(ruta):
         return []
     except: return []
 
-# --- CORRECCIÓN DEFINITIVA PDF ---
+# --- FUNCIÓN PDF CORREGIDA (TRUCO BINARIO) ---
 def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, metodo):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, "MORITA MINIMERCADO", ln=True, align="C")
     
-    pdf.set_font("Helvetica", "", 10)
+    pdf.set_font("Arial", "", 10)
     ahora = obtener_fecha_hora()
     pdf.cell(0, 5, f"FECHA: {ahora.strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
     pdf.cell(0, 5, f"CAJERO: {vendedor}", ln=True, align="C")
     pdf.ln(5)
     
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_font("Arial", "B", 10)
     pdf.cell(100, 8, "Producto", border=1)
     pdf.cell(20, 8, "Cant.", border=1)
     pdf.cell(35, 8, "Subtotal", border=1, ln=True)
     
-    pdf.set_font("Helvetica", "", 10)
+    pdf.set_font("Arial", "", 10)
     for item in carrito:
         c_v = f"{item['Cantidad']:g}"
         pdf.cell(100, 8, str(item['Producto']), border=1)
@@ -47,11 +47,11 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         pdf.cell(35, 8, f"${item['Subtotal']:,.0f}", border=1, ln=True)
     
     pdf.ln(5)
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
     
-    # El método output() sin argumentos devuelve los bytes necesarios para Streamlit
-    return pdf.output()
+    # El secreto: Usamos 'S' y codificamos a latin-1 para que Streamlit lo trate como binario puro
+    return pdf.output(dest='S').encode('latin-1')
 
 def mostrar_caja():
     st.markdown("""
@@ -147,7 +147,6 @@ def mostrar_caja():
             if metodo == "Transferencia" or metodo == "Ambos":
                 st.write(f"**Transferencia:** ${p_tra:,.0f}")
 
-            # BOTÓN FINALIZAR
             if st.button("✅ FINALIZAR VENTA", use_container_width=True):
                 ahora = obtener_fecha_hora()
                 ventas = cargar_json("data/ventas_diarias.json")
@@ -163,21 +162,21 @@ def mostrar_caja():
                 with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                     json.dump(ventas, f, indent=4)
                 
-                # GENERACIÓN DE PDF (Sin bytes() adicional)
+                # Generamos el PDF con el nuevo truco
                 st.session_state.ticket_ready = generar_ticket_pdf(st.session_state.carrito, total, st.session_state.usuario_data['nombre'], p_efe, p_tra, vuelto, metodo)
                 st.success("Venta Registrada")
 
-            # BOTONES POST-VENTA
+            # --- SECCIÓN BOTONES POST-VENTA ---
             if "ticket_ready" in st.session_state:
                 st.download_button(
-                    label="🖨️ DESCARGAR TICKET", 
+                    label="🖨️ TICKET", 
                     data=st.session_state.ticket_ready, 
                     file_name=f"ticket_{datetime.datetime.now().strftime('%H%M%S')}.pdf", 
                     mime="application/pdf",
                     use_container_width=True
                 )
                 
-                if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="primary"):
+                if st.button("🔄 NUEVA VENTA / FACTURA", use_container_width=True, type="primary"):
                     st.session_state.carrito = []
                     if "ticket_ready" in st.session_state:
                         del st.session_state.ticket_ready
