@@ -27,17 +27,20 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, "MORITA MINIMERCADO", ln=True, align="C")
+    
     pdf.set_font("Arial", "", 10)
     ahora = obtener_fecha_hora()
     pdf.cell(0, 5, f"FECHA: {ahora.strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
     pdf.cell(0, 5, f"CAJERO: {vendedor}", ln=True, align="C")
     pdf.ln(5)
     
+    # Encabezados de tabla
     pdf.set_font("Arial", "B", 10)
     pdf.cell(100, 8, "Producto", border=1)
     pdf.cell(20, 8, "Cant.", border=1)
     pdf.cell(35, 8, "Subtotal", border=1, ln=True)
     
+    # Productos
     pdf.set_font("Arial", "", 10)
     for item in carrito:
         c_v = f"{item['Cantidad']:g}"
@@ -48,7 +51,9 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
-    # Corrección para FPDF2 en Streamlit
+    
+    # --- CORRECCIÓN CLAVE ---
+    # Convertimos el PDF a una cadena de bytes compatible con Streamlit
     return pdf.output()
 
 def mostrar_caja():
@@ -167,10 +172,13 @@ def mostrar_caja():
                 st.success("Venta Registrada")
 
             if "ticket_ready" in st.session_state:
-                st.download_button("🖨️ TICKET", st.session_state.ticket_ready, file_name="ticket.pdf", use_container_width=True)
-                if st.button("🔄 NUEVA FACTURA", use_container_width=True):
-                    st.session_state.carrito = []; del st.session_state.ticket_ready; st.rerun()
-
+                st.download_button(
+                    label="🖨️ TICKET", 
+                    data=st.session_state.ticket_ready, 
+                    file_name=f"ticket_{datetime.datetime.now().strftime('%H%M%S')}.pdf", 
+                    mime="application/pdf", # Esto asegura que no se descargue vacío
+                    use_container_width=True
+                )
     # --- HISTORIAL GENERAL Y CIERRE (ADMIN) ---
     if st.session_state.get('rol') == "admin":
         st.divider()
