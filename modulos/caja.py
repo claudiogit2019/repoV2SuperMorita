@@ -2,11 +2,17 @@ import streamlit as st
 import json
 import datetime
 import pandas as pd
-import tempfile
 import os
 from fpdf import FPDF
 from streamlit_mic_recorder import mic_recorder
 from gemini_service import procesar_voz_completo 
+
+# --- CONFIGURACIÓN DE HORA ARGENTINA ---
+def obtener_fecha_hora():
+    # Sumamos o restamos horas según el servidor (Streamlit suele usar UTC)
+    # Para Argentina es UTC-3
+    ahora = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=3)
+    return ahora
 
 def cargar_json(ruta):
     try:
@@ -23,7 +29,8 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
     pdf.set_font("Arial", "B", 16)
     pdf.cell(0, 10, "MORITA MINIMERCADO", ln=True, align="C")
     pdf.set_font("Arial", "", 10)
-    pdf.cell(0, 5, f"FECHA: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
+    ahora = obtener_fecha_hora()
+    pdf.cell(0, 5, f"FECHA: {ahora.strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
     pdf.cell(0, 5, f"CAJERO: {vendedor}", ln=True, align="C")
     pdf.ln(5)
     
@@ -53,7 +60,7 @@ def mostrar_caja():
 
     with col_izq:
         st.subheader("🎙️ COMANDO DE VOZ")
-        audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PARAR", key='mic_prod_v1')
+        audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PARAR", key='mic_v_final_morita')
         
         if audio:
             with st.spinner("IA Analizando..."):
@@ -83,7 +90,7 @@ def mostrar_caja():
 
         st.divider()
         st.subheader("🔍 BÚSQUEDA MANUAL")
-        busq = st.text_input("Buscar producto:").upper()
+        busq = st.text_input("Buscar:").upper()
         if len(busq) >= 2:
             coincidencias = [p for p in inv if busq in str(p['Producto']).upper()]
             for p in coincidencias:
@@ -111,7 +118,7 @@ def mostrar_caja():
                     st.rerun()
 
             st.divider()
-            metodo = st.radio("Metodo:", ["Efectivo", "Transferencia", "Ambos"], horizontal=True)
+            metodo = st.radio("Pago:", ["Efectivo", "Transferencia", "Ambos"], horizontal=True)
             p_efe, p_tra, vuelto = 0.0, 0.0, 0.0
             
             if metodo == "Efectivo":
@@ -123,7 +130,7 @@ def mostrar_caja():
                 c1, c2 = st.columns(2); p_efe = c1.number_input("Efe:"); p_tra = c2.number_input("Transf:")
                 vuelto = max(0.0, (p_efe + p_tra) - total)
 
-            # --- ACTUALIZACIÓN 1: FORMATO FACTURA INTERNA ---
+            # --- VISTA DE PAGO SOLICITADA ---
             st.divider()
             st.markdown(f"### TOTAL: ${total:,.0f}")
             if metodo != "Transferencia":
@@ -133,14 +140,14 @@ def mostrar_caja():
                 st.write(f"**Transferencia:** ${p_tra:,.0f}")
 
             if st.button("✅ FINALIZAR VENTA", use_container_width=True):
+                ahora = obtener_fecha_hora()
                 ventas = cargar_json("data/ventas_diarias.json")
                 ventas.append({
-                    "fecha": datetime.datetime.now().strftime("%Y-%m-%d"),
-                    "mes": datetime.datetime.now().strftime("%Y-%m"),
-                    "hora": datetime.datetime.now().strftime("%H:%M:%S"),
+                    "fecha": ahora.strftime("%Y-%m-%d"),
+                    "mes": ahora.strftime("%Y-%m"),
+                    "hora": ahora.strftime("%H:%M:%S"),
                     "vendedor": st.session_state.usuario_data['nombre'],
                     "total": total, "metodo": metodo,
-                    "efectivo": p_efe, "transferencia": p_tra, "vuelto": vuelto,
                     "detalle": st.session_state.carrito
                 })
                 os.makedirs("data", exist_ok=True)
@@ -155,7 +162,7 @@ def mostrar_caja():
                 if st.button("🔄 NUEVA FACTURA", use_container_width=True):
                     st.session_state.carrito = []; del st.session_state.ticket_ready; st.rerun()
 
-    # --- ACTUALIZACIÓN 2 Y 3: CIERRE SIN DECIMALES E HISTORIAL GENERAL ---
+    # --- HISTORIAL GENERAL Y CIERRE (ADMIN) ---
     if st.session_state.get('rol') == "admin":
         st.divider()
         st.subheader("📅 HISTORIAL Y CIERRE (ADMIN)")
@@ -163,28 +170,25 @@ def mostrar_caja():
         if v_hist:
             df = pd.DataFrame(v_hist)
             
-            # Ver detalle de productos sin decimales excesivos (1.0000 -> 1)
-            if st.checkbox("Ver desglose de productos vendidos"):
+            if st.checkbox("Ver detalle productos"):
                 items_cierre = []
                 for v in v_hist:
                     for d in v['detalle']:
                         items_cierre.append({
+                            "Fecha": v['fecha'],
                             "Producto": d['Producto'],
-                            "Cantidad": f"{d['Cantidad']:g}", # Formato inteligente
-                            "Subtotal": f"${d['Subtotal']:,.0f}"
+                            "Cant": f"{d['Cantidad']:g}", # Limpia el 1.0000 -> 1
+                            "Subtotal": d['Subtotal']
                         })
                 st.table(pd.DataFrame(items_cierre).tail(20))
-
-            # Tabla General de Ventas
+            
             df_ver = df[['fecha', 'hora', 'vendedor', 'total', 'metodo']].copy()
             df_ver['total'] = df_ver['total'].apply(lambda x: f"${x:,.0f}")
-            st.dataframe(df_ver.tail(15), use_container_width=True)
+            st.dataframe(df_ver.tail(20), use_container_width=True)
             
-            # Métricas Históricas y Mensuales
-            c1, c2 = st.columns(2)
-            c1.metric("TOTAL HISTÓRICO", f"${df['total'].sum():,.0f}")
-            mes_actual = datetime.datetime.now().strftime("%Y-%m")
+            c_m1, c_m2 = st.columns(2)
+            c_m1.metric("TOTAL HISTÓRICO", f"${df['total'].sum():,.0f}")
+            ahora = obtener_fecha_hora()
+            mes_actual = ahora.strftime("%Y-%m")
             total_mes = df[df['mes'] == mes_actual]['total'].sum() if 'mes' in df.columns else 0
-            c2.metric(f"VENTA MES ({mes_actual})", f"${total_mes:,.0f}")
-        else:
-            st.info("No hay ventas registradas en el historial.")
+            c_m2.metric(f"VENTA MES ({mes_actual})", f"${total_mes:,.0f}")

@@ -3,6 +3,7 @@ import json
 import os
 import datetime
 from dotenv import load_dotenv
+from modulos import caja, inventario_abm, reporte, usuarios
 
 # CONFIGURACIÓN DE PÁGINA
 st.set_page_config(layout="wide", page_title="MORITA V2", initial_sidebar_state="expanded")
