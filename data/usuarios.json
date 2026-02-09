@@ -1,0 +1,30 @@
+[
+    {
+        "usuario": "pame",
+        "clave": "pame1234",
+        "rol": "vendedor",
+        "nombre": "Pamela Cortez",
+        "activo": true
+    },
+    {
+        "usuario": "vero",
+        "clave": "vero1234",
+        "rol": "admin",
+        "nombre": "vero colque",
+        "activo": true
+    },
+    {
+        "usuario": "david",
+        "clave": "david1234",
+        "rol": "admin",
+        "nombre": "david colque",
+        "activo": true
+    },
+    {
+        "usuario": "Mora",
+        "clave": "Mora1234",
+        "rol": "vendedor",
+        "nombre": "Morita",
+        "activo": true
+    }
+]

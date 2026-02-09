@@ -1,0 +1,68 @@
+[
+    {
+        "fecha": "2026-02-08",
+        "hora": "20:51:10",
+        "vendedor": "david colque",
+        "total": 12546.0,
+        "metodo": "Efectivo",
+        "efectivo": 15000.0,
+        "transferencia": 0.0,
+        "detalle": [
+            {
+                "Producto": "Coca cola 2000",
+                "Precio": 2500,
+                "Cantidad": 1.0,
+                "Subtotal": 2500.0
+            },
+            {
+                "Producto": "Coca cola 1500  c/ b",
+                "Precio": 3000,
+                "Cantidad": 1.0,
+                "Subtotal": 3000.0
+            },
+            {
+                "Producto": "Coca cola 1500 ",
+                "Precio": 3500,
+                "Cantidad": 1.0,
+                "Subtotal": 3500.0
+            },
+            {
+                "Producto": "Coca cola 2500 ",
+                "Precio": 3546,
+                "Cantidad": 1.0,
+                "Subtotal": 3546.0
+            }
+        ]
+    },
+    {
+        "fecha": "2026-02-08",
+        "mes": "2026-02",
+        "hora": "21:16:21",
+        "vendedor": "Pamela Cortez",
+        "total": 40200.0,
+        "metodo": "Ambos",
+        "efectivo": 40000.0,
+        "transferencia": 200.0,
+        "vuelto": 0.0,
+        "detalle": [
+            {
+                "Producto": "CERVEZA SALTA 1.5",
+                "Precio": 3800.0,
+                "Cantidad": 4.0,
+                "Subtotal": 15200.0
+            },
+            {
+                "Producto": "Coca cola 2000",
+                "Precio": 2500,
+                "Cantidad": 4.0,
+                "Subtotal": 10000.0
+            },
+            {
+                "Producto": "Coca cola 1500  c/ b",
+                "Precio": 3000,
+                "Cantidad": 5.0,
+                "Subtotal": 15000.0
+            }
+        ]
+    }
+]

@@ -1,0 +1,334 @@
+[
+    {
+        "Producto": "Coca cola 2000",
+        "Precio": 2500
+    },
+    {
+        "Producto": "Coca cola 1500  c/ b",
+        "Precio": 3000
+    },
+    {
+        "Producto": "Coca cola 1500 ",
+        "Precio": 3500
+    },
+    {
+        "Producto": "Coca cola 2500 ",
+        "Precio": 3546
+    },
+    {
+        "Producto": "Sprite 375 ",
+        "Precio": 3592
+    },
+    {
+        "Producto": "Sprite 600 ",
+        "Precio": 3615
+    },
+    {
+        "Producto": "Sprite 2000 ",
+        "Precio": 3638
+    },
+    {
+        "Producto": "Sprite 3000 ",
+        "Precio": 3661
+    },
+    {
+        "Producto": "Fanta 250",
+        "Precio": 3684
+    },
+    {
+        "Producto": "Fanta 375 ",
+        "Precio": 3707
+    },
+    {
+        "Producto": "Fanta 600 ",
+        "Precio": 3730
+    },
+    {
+        "Producto": "Fanta 2000 ",
+        "Precio": 3753
+    },
+    {
+        "Producto": "Fanta 3000 ",
+        "Precio": 3776
+    },
+    {
+        "Producto": "Paso de los toros 250",
+        "Precio": 3799
+    },
+    {
+        "Producto": "Pepsi 250 ",
+        "Precio": 3822
+    },
+    {
+        "Producto": "Pepsi 1250 ",
+        "Precio": 3845
+    },
+    {
+        "Producto": "Pepsi 2000 ",
+        "Precio": 3868
+    },
+    {
+        "Producto": "Pepsi 3000 ",
+        "Precio": 3891
+    },
+    {
+        "Producto": "Mirinda 2000 ",
+        "Precio": 3914
+    },
+    {
+        "Producto": "Mirinda 3000 # ",
+        "Precio": 3937
+    },
+    {
+        "Producto": "Manaos 3000 ",
+        "Precio": 3960
+    },
+    {
+        "Producto": "Marinaro ice 2 1/4  ",
+        "Precio": 3983
+    },
+    {
+        "Producto": "Secco 3000 #240",
+        "Precio": 4006
+    },
+    {
+        "Producto": "Cabalgata ",
+        "Precio": 4029
+    },
+    {
+        "Producto": "Crush # ",
+        "Precio": 4052
+    },
+    {
+        "Producto": "Quilmes 1000",
+        "Precio": 4075
+    },
+    {
+        "Producto": "Quilmes 1200",
+        "Precio": 4098
+    },
+    {
+        "Producto": "Quilmes lata",
+        "Precio": 4121
+    },
+    {
+        "Producto": "Salta 1000",
+        "Precio": 4144
+    },
+    {
+        "Producto": "Salta 1000 negra",
+        "Precio": 4167
+    },
+    {
+        "Producto": "Salta lata",
+        "Precio": 4190
+    },
+    {
+        "Producto": "Salra roja",
+        "Precio": 4213
+    },
+    {
+        "Producto": "Miller",
+        "Precio": 4236
+    },
+    {
+        "Producto": "Miler premium",
+        "Precio": 4259
+    },
+    {
+        "Producto": "Bhama 1000",
+        "Precio": 4282
+    },
+    {
+        "Producto": "Bhama lata ",
+        "Precio": 4305
+    },
+    {
+        "Producto": "Corona",
+        "Precio": 4328
+    },
+    {
+        "Producto": "Vida Baggio 1500 ",
+        "Precio": 4351
+    },
+    {
+        "Producto": "Agua ideal 500 ",
+        "Precio": 4374
+    },
+    {
+        "Producto": "Agua ideal 1500 ",
+        "Precio": 4397
+    },
+    {
+        "Producto": "Agua ideal 6000 ",
+        "Precio": 4420
+    },
+    {
+        "Producto": "Agua Benedictino 2000 ",
+        "Precio": 4443
+    },
+    {
+        "Producto": "Aquarius naranja 2250 ",
+        "Precio": 4466
+    },
+    {
+        "Producto": "Aquarius pomelo ",
+        "Precio": 4489
+    },
+    {
+        "Producto": "Aquarius E4manzana",
+        "Precio": 4512
+    },
+    {
+        "Producto": "Aquarius pera",
+        "Precio": 4535
+    },
+    {
+        "Producto": "Aquarius lima",
+        "Precio": 4558
+    },
+    {
+        "Producto": "Ades manzana ",
+        "Precio": 4581
+    },
+    {
+        "Producto": "Ades soja #",
+        "Precio": 4604
+    },
+    {
+        "Producto": "Ades vainilla",
+        "Precio": 4627
+    },
+    {
+        "Producto": "Ades naranja",
+        "Precio": 4650
+    },
+    {
+        "Producto": "Ades durazno ",
+        "Precio": 4673
+    },
+    {
+        "Producto": "Ades pera",
+        "Precio": 4696
+    },
+    {
+        "Producto": "Ades chocolate ",
+        "Precio": 4719
+    },
+    {
+        "Producto": "Baggio naranja",
+        "Precio": 4742
+    },
+    {
+        "Producto": "Baggio manzana",
+        "Precio": 4765
+    },
+    {
+        "Producto": "Baggio durazno ",
+        "Precio": 4788
+    },
+    {
+        "Producto": "Baggio multifruta",
+        "Precio": 4811
+    },
+    {
+        "Producto": "Manzana ",
+        "Precio": 4834
+    },
+    {
+        "Producto": "Naranja ",
+        "Precio": 4857
+    },
+    {
+        "Producto": "Tanjarina ",
+        "Precio": 4880
+    },
+    {
+        "Producto": "Lim\u00f3n ",
+        "Precio": 4903
+    },
+    {
+        "Producto": "Papa ",
+        "Precio": 4926
+    },
+    {
+        "Producto": "Melon",
+        "Precio": 4949
+    },
+    {
+        "Producto": "Lechuga crespa ",
+        "Precio": 4972
+    },
+    {
+        "Producto": "Zanahoria ",
+        "Precio": 4995
+    },
+    {
+        "Producto": "Cebolla ",
+        "Precio": 5018
+    },
+    {
+        "Producto": "Zapallo",
+        "Precio": 5041
+    },
+    {
+        "Producto": "Acelga ",
+        "Precio": 5064
+    },
+    {
+        "Producto": "Verdeo ",
+        "Precio": 5087
+    },
+    {
+        "Producto": "Apio ",
+        "Precio": 5110
+    },
+    {
+        "Producto": "Tomate ",
+        "Precio": 5133
+    },
+    {
+        "Producto": "Morr\u00f3n ",
+        "Precio": 5156
+    },
+    {
+        "Producto": "Remolacha ",
+        "Precio": 5179
+    },
+    {
+        "Producto": "COCA COLA 250 ",
+        "Precio": 1200.0
+    },
+    {
+        "Producto": "CERVEZA SALTA 1.5",
+        "Precio": 3800.0
+    },
+    {
+        "Producto": "COCA COLA 2000 ",
+        "Precio": 4000.0
+    },
+    {
+        "Producto": "QUESO CREMON",
+        "Precio": 5000.0
+    },
+    {
+        "Producto": "ACEITE MAROLIO",
+        "Precio": 3000.0
+    },
+    {
+        "Producto": "ACEITE NATURA",
+        "Precio": 3500.0
+    },
+    {
+        "Producto": "ACEITE MEZCLA",
+        "Precio": 2500.0
+    },
+    {
+        "Producto": "SPRITE 250",
+        "Precio": 5000.0
+    },
+    {
+        "Producto": "COCA COLA 375 #120",
+        "Precio": 1200.0
+    }
+]
