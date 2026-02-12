@@ -1,6 +1,6 @@
 {
     "caja_abierta": true,
-    "monto_inicio": 10000.0,
+    "monto_inicio": 0.0,
     "turno_actual": "Turno 1",
     "vendedor_apertura": "veronica",
     "fecha_apertura": "2026-02-12"

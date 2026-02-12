@@ -1,53 +1,17 @@
 [
     {
         "fecha": "2026-02-12",
-        "hora": "15:31:44",
-        "vendedor": "pamela",
+        "hora": "17:13:31",
+        "vendedor": "veronica",
         "turno": "Turno 1",
-        "total": 18946.0,
+        "total": 38000.0,
         "metodo": "Efectivo",
         "detalle": [
             {
-                "Producto": "Coca cola 2000",
-                "Precio": 2500,
-                "Cantidad": 1.0,
-                "Subtotal": 2500.0
-            },
-            {
-                "Producto": "Coca cola 1500  c/ b",
-                "Precio": 3000,
-                "Cantidad": 1.0,
-                "Subtotal": 3000.0
-            },
-            {
-                "Producto": "Coca cola 1500 ",
-                "Precio": 3500,
-                "Cantidad": 1.0,
-                "Subtotal": 3500.0
-            },
-            {
-                "Producto": "Coca cola 2500 ",
-                "Precio": 3546,
-                "Cantidad": 1.0,
-                "Subtotal": 3546.0
-            },
-            {
-                "Producto": "COCA COLA 250 ",
-                "Precio": 1200.0,
-                "Cantidad": 1.0,
-                "Subtotal": 1200.0
-            },
-            {
-                "Producto": "COCA COLA 2000 ",
-                "Precio": 4000.0,
-                "Cantidad": 1.0,
-                "Subtotal": 4000.0
-            },
-            {
-                "Producto": "COCA COLA 375 #120",
-                "Precio": 1200.0,
-                "Cantidad": 1.0,
-                "Subtotal": 1200.0
+                "Producto": "CERVEZA SALTA 1.5",
+                "Precio": 3800.0,
+                "Cantidad": 10.0,
+                "Subtotal": 38000.0
             }
         ]
     }
