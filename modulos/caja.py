@@ -20,7 +20,6 @@ def cargar_json(ruta):
         if os.path.exists(ruta):
             with open(ruta, "r", encoding='utf-8') as f: 
                 content = f.read()
-                # Ajuste: Si es el archivo de ventas debe ser lista [], si es estado debe ser dict {}
                 data = json.loads(content) if content else {}
                 return data
         return {}
@@ -46,7 +45,8 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         
         pdf.set_font("Arial", "", 10)
         for item in carrito:
-            c_v = f"{item['Cantidad']:g}"
+            # Soporte para ambas formas de clave 'Cantidad' o 'Cant'
+            c_v = f"{item.get('Cantidad', item.get('Cant', 1)):g}"
             pdf.cell(100, 8, str(item['Producto'])[:35], border=1)
             pdf.cell(20, 8, str(c_v), border=1)
             pdf.cell(35, 8, f"${item['Subtotal']:,.0f}", border=1, ln=True)
@@ -54,6 +54,8 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         pdf.ln(5)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(0, 8, f"PAGO: ${paga_efe + paga_tra:,.0f} | VUELTO: ${vuelto:,.0f}", ln=True, align="R")
         
         output_raw = pdf.output()
         if isinstance(output_raw, bytearray):
@@ -86,7 +88,6 @@ def mostrar_caja():
     t_actual = st.session_state.turno_actual
     st.title(f"🛒 CAJA - {t_actual}") 
 
-    # Carga de inventario asegurando lista
     inv_data = cargar_json("data/inventario.json")
     inv = inv_data if isinstance(inv_data, list) else []
     
@@ -94,7 +95,7 @@ def mostrar_caja():
 
     # --- COMANDO DE VOZ ---
     with st.expander("🎙️ PEDIDO POR VOZ"):
-        audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PROCESAR", key='mic_caja_v3')
+        audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PROCESAR", key='mic_vfinal')
         if audio:
             with st.spinner("Analizando..."):
                 try:
@@ -140,7 +141,7 @@ def mostrar_caja():
     with col_der:
         st.subheader("📋 CARRITO")
         
-        # SI HAY TICKET LISTO, BLOQUEAMOS EL CARRITO Y MOSTRAMOS DESCARGA
+        # --- LÓGICA DE TICKET LISTO (ACTUALIZADA) ---
         if "ticket_ready" in st.session_state and st.session_state.ticket_ready:
             st.success("✅ VENTA FINALIZADA CON ÉXITO")
             st.divider()
@@ -152,9 +153,10 @@ def mostrar_caja():
                 use_container_width=True,
                 key="btn_descarga_final_cloud"
             )
-            if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="primary"):
+            # Botón fundamental para limpiar el estado y permitir nueva venta
+            if st.button("🔄 NUEVA VENTA / FACTURA", use_container_width=True, type="primary"):
                 st.session_state.carrito = []
-                del st.session_state.ticket_ready
+                if "ticket_ready" in st.session_state: del st.session_state.ticket_ready
                 st.rerun()
         
         # SI NO HAY TICKET, MOSTRAMOS EL CARRITO NORMAL
@@ -162,7 +164,7 @@ def mostrar_caja():
             total = sum(i['Subtotal'] for i in st.session_state.carrito)
             for idx, item in enumerate(st.session_state.carrito):
                 ca, cb, cc = st.columns([2.5, 1, 0.5])
-                ca.write(f"{item['Producto']} (x{item['Cantidad']:g})")
+                ca.write(f"{item['Producto']} (x{item.get('Cantidad', 1):g})")
                 cb.write(f"${item['Subtotal']:,.0f}")
                 if cc.button("❌", key=f"del_{idx}"):
                     st.session_state.carrito.pop(idx)
@@ -173,7 +175,7 @@ def mostrar_caja():
             p_efe, p_tra, vuelto = 0.0, 0.0, 0.0
             
             if metodo == "Efectivo":
-                p_efe = st.number_input("Paga con $:", min_value=0.0, step=100.0)
+                p_efe = st.number_input("Paga con $:", min_value=0.0, step=100.0, value=float(total))
                 vuelto = max(0.0, p_efe - total)
             elif metodo == "Transferencia": p_tra = total
             else:
@@ -191,7 +193,6 @@ def mostrar_caja():
                     st.error("⚠️ LA CAJA ESTÁ CERRADA.")
                 else:
                     ahora = obtener_fecha_hora()
-                    # Cargar ventas diarias asegurando lista
                     ventas_data = cargar_json("data/ventas_diarias.json")
                     ventas_diarias = ventas_data if isinstance(ventas_data, list) else []
                     
@@ -205,7 +206,7 @@ def mostrar_caja():
                     with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                         json.dump(ventas_diarias, f, indent=4)
                     
-                    # GENERAR PDF
+                    # GENERAR PDF Y GUARDAR EN SESSION STATE
                     pdf_bytes = generar_ticket_pdf(
                         st.session_state.carrito, total, 
                         st.session_state.usuario_data['nombre'], 
@@ -214,6 +215,6 @@ def mostrar_caja():
                     
                     if pdf_bytes:
                         st.session_state.ticket_ready = pdf_bytes
-                        st.rerun() # Recarga para mostrar la sección de éxito y descarga
+                        st.rerun() 
         else:
             st.info("El carrito está vacío.")
