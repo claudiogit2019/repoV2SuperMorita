@@ -15,107 +15,106 @@ if "GROQ_API_KEY" not in st.session_state:
 
 # --- AJUSTE DE HORA ARGENTINA (UTC-3) ---
 def obtener_ahora_argentina():
-    # Streamlit Cloud suele usar UTC, restamos 3 horas
     return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=3)
 
-# CSS PARA LETRA GRANDE Y DISEÑO PROFESIONAL
+# CSS ACTUALIZADO: Mobile-Friendly y Limpieza de Login
 st.markdown("""
     <style>
-        html, body, [class*="st-"] { font-size: 1.2rem !important; }
-        .stButton > button { height: 3em !important; font-size: 1.3rem !important; width: 100%; }
-        .stTextInput input, .stSelectbox div { height: 50px !important; font-size: 1.3rem !important; }
-        .titulo-morita { color: #D32F2F; font-size: 4rem !important; font-weight: bold; text-align: center; margin-top: -20px; }
-        .fecha-login { text-align: center; background-color: #F0F2F6; padding: 20px; border-radius: 15px; border: 2px solid #D32F2F; margin-bottom: 30px; }
+        html, body, [class*="st-"] { font-size: 1.1rem !important; }
+        /* Botones grandes para uso táctil en celular */
+        .stButton > button { height: 3.5em !important; font-size: 1.2rem !important; width: 100%; border-radius: 10px; }
+        .stTextInput input, .stSelectbox div { height: 55px !important; font-size: 1.2rem !important; }
+        
+        .titulo-morita { color: #D32F2F; font-size: 3.5rem !important; font-weight: bold; text-align: center; margin-bottom: 20px; }
+        .fecha-interior { text-align: right; color: #555; font-size: 1rem; font-weight: bold; margin-bottom: 10px; margin-top: -30px; }
+        
         [data-testid="stSidebar"] { background-color: #1E1E1E; }
         [data-testid="stSidebar"] * { color: white !important; font-size: 1.1rem !important; }
-        /* Ocultar instrucciones de "Press Enter to apply" */
+        
+        /* Ocultar instrucciones de Streamlit para ganar espacio en celular */
         div[data-testid="InputInstructions"] { display: none; }
+        
+        /* Ajustes específicos para móviles */
+        @media (max-width: 640px) {
+            .titulo-morita { font-size: 2.2rem !important; }
+            .stButton > button { height: 3em !important; font-size: 1.1rem !important; }
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE APOYO ---
 def cargar_usuarios():
     ruta_usuarios = "data/usuarios.json"
     if os.path.exists(ruta_usuarios):
         try:
             with open(ruta_usuarios, "r", encoding='utf-8') as f:
                 return json.load(f)
-        except:
-            pass
+        except: pass
     return [{"usuario": "admin", "clave": "1234", "rol": "admin", "nombre": "Administrador"}]
 
-# --- LÓGICA DE PERSISTENCIA INICIAL ---
+# --- LÓGICA DE PERSISTENCIA ---
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
     st.session_state.rol = None
     st.session_state.usuario_data = None
 
-# --- PANTALLA DE LOGIN ---
+# --- PANTALLA DE LOGIN (Sin Fecha/Hora según pedido) ---
 if not st.session_state.autenticado:
-    # --- ENCABEZADO DE FECHA Y HORA AJUSTADO A ARGENTINA ---
-    ahora = obtener_ahora_argentina()
-    dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    st.markdown('<div style="margin-top: 50px;"></div>', unsafe_allow_html=True)
+    st.markdown('<h1 class="titulo-morita">🍎 MINIMERCADO<br>MORITA</h1>', unsafe_allow_html=True)
     
-    fecha_hoy = f"{dias_semana[ahora.weekday()]}, {ahora.day} de {meses[ahora.month-1]} de {ahora.year}"
-    hora_hoy = ahora.strftime("%H:%M")
-
-    st.markdown(f"""
-        <div class="fecha-login">
-            <div style="font-size: 1.8rem; color: #555;">{fecha_hoy}</div>
-            <div style="font-size: 5rem; font-weight: bold; color: #D32F2F; line-height: 1;">{hora_hoy}</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('<h1 class="titulo-morita">🍎 MINIMERCADO MORITA </h1>', unsafe_allow_html=True)
-    
-    # Contenedor de Login centrado
-    _, col_centro, _ = st.columns([1, 1, 1])
+    _, col_centro, _ = st.columns([0.5, 2, 0.5]) # Ajuste para que en celular el form sea ancho
     with col_centro:
         with st.form("login_form"):
             u_input = st.text_input("USUARIO").strip()
             p_input = st.text_input("CONTRASEÑA", type="password").strip()
-            boton_login = st.form_submit_button("INGRESAR AL SISTEMA")
-            
-            if boton_login:
+            if st.form_submit_button("INGRESAR"):
                 lista_usuarios = cargar_usuarios()
                 user_found = next((u for u in lista_usuarios if u['usuario'] == u_input and u['clave'] == p_input), None)
-                
                 if user_found:
                     st.session_state.autenticado = True
                     st.session_state.rol = user_found['rol']
                     st.session_state.usuario_data = user_found
                     st.rerun()
                 else:
-                    st.error("❌ Usuario o Clave incorrectos")
+                    st.error("❌ Credenciales incorrectas")
 
 # --- SISTEMA AUTENTICADO ---
 else:
-    # Sidebar con info del usuario logueado
+    # Fecha/Hora solo en el interior
+    ahora = obtener_ahora_argentina()
+    st.markdown(f'<div class="fecha-interior">📅 {ahora.strftime("%d/%m/%Y")} | ⏰ {ahora.strftime("%H:%M")}</div>', unsafe_allow_html=True)
+
+    # Sidebar: Info Usuario
     st.sidebar.markdown(f"### 👤 {st.session_state.usuario_data['nombre']}")
-    st.sidebar.markdown(f"**Perfil:** {st.session_state.rol.upper()}")
+    st.sidebar.markdown(f"**Rol:** {st.session_state.rol.upper()}")
     st.sidebar.divider()
     
-    # Definir opciones del menú según ROL
-    opciones = ["🛒 CAJA / VENTAS"]
+    # MENÚ REORGANIZADO SEGÚN REQUERIMIENTOS ACTUALES
+    opciones = ["🛒 CAJA"]
     if st.session_state.rol == "admin":
-        opciones += ["📦 GESTIÓN PRODUCTOS", "📊 CIERRE DE CAJA", "👤 GESTIÓN USUARIOS"]
+        opciones += ["📦 PRODUCTOS", "👤 GESTIÓN USUARIOS", "💰 APERTURA / CIERRE", "📅 HISTORIAL GENERAL"]
+    else:
+        # Los vendedores quizás necesitan ver Productos para consultar precios solamente
+        opciones += ["📦 PRODUCTOS"]
     
-    menu = st.sidebar.radio("MENÚ PRINCIPAL", opciones)
+    menu = st.sidebar.radio("MENÚ", opciones)
 
     st.sidebar.divider()
-    if st.sidebar.button("🚪 CERRAR SESIÓN"):
+    if st.sidebar.button("🚪 SALIR"):
         st.session_state.autenticado = False
         st.session_state.usuario_data = None
         st.session_state.rol = None
+        if 'carrito' in st.session_state: st.session_state.carrito = []
         st.rerun()
 
     # --- NAVEGACIÓN DE MÓDULOS ---
-    if menu == "🛒 CAJA / VENTAS":
+    if menu == "🛒 CAJA":
         caja.mostrar_caja()
-    elif menu == "📦 GESTIÓN PRODUCTOS":
+    elif menu == "📦 PRODUCTOS":
         inventario_abm.mostrar_abm()
-    elif menu == "📊 CIERRE DE CAJA":
-        reporte.mostrar_reporte()
+    elif menu == "💰 APERTURA / CIERRE":
+        reporte.mostrar_reporte() # Maneja la lógica de limpiar turno y arqueo
+    elif menu == "📅 HISTORIAL GENERAL":
+        reporte.mostrar_historial_permanente() # La nueva función con el botón de limpiar
     elif menu == "👤 GESTIÓN USUARIOS":
         usuarios.mostrar_gestion_usuarios()
