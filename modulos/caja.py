@@ -45,7 +45,6 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         
         pdf.set_font("Arial", "", 10)
         for item in carrito:
-            # Soporte para ambas formas de clave 'Cantidad' o 'Cant'
             c_v = f"{item.get('Cantidad', item.get('Cant', 1)):g}"
             pdf.cell(100, 8, str(item['Producto'])[:35], border=1)
             pdf.cell(20, 8, str(c_v), border=1)
@@ -68,14 +67,21 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         return None
 
 def mostrar_caja():
-    # --- BLOQUE DE SINCRONIZACIÓN REMOTA ---
+    # --- 1. BLOQUE DE SINCRONIZACIÓN Y VALIDACIÓN DE CAJA (CORREGIDO) ---
     estado_disco = cargar_json("data/estado_caja.json")
+    caja_abierta_real = False
+    
     if isinstance(estado_disco, dict) and estado_disco.get("caja_abierta", False):
         st.session_state.caja_abierta = True
         st.session_state.turno_actual = estado_disco.get("turno_actual", "S/T")
+        caja_abierta_real = True
     else:
         st.session_state.caja_abierta = False
         st.session_state.turno_actual = "S/T"
+
+    # Si la caja no está abierta, mostramos el mensaje de advertencia inmediatamente
+    if not caja_abierta_real:
+        st.error("⚠️ LA CAJA ESTÁ CERRADA. Por favor, abra la caja desde la Gestión de Inventario/Cierre para comenzar a vender.")
 
     st.markdown("""
         <style>
@@ -93,7 +99,7 @@ def mostrar_caja():
     
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
-    # --- COMANDO DE VOZ ---
+    # --- 2. COMANDO DE VOZ ---
     with st.expander("🎙️ PEDIDO POR VOZ"):
         audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PROCESAR", key='mic_vfinal')
         if audio:
@@ -139,27 +145,29 @@ def mostrar_caja():
                     st.rerun()
 
     with col_der:
-        st.subheader("📋 CARRITO")
+        st.subheader("📋 CARRITO / FACTURA")
         
-        # --- LÓGICA DE TICKET LISTO (ACTUALIZADA) ---
+        # --- 3. LÓGICA DE TICKET Y NUEVA VENTA (CORREGIDO) ---
         if "ticket_ready" in st.session_state and st.session_state.ticket_ready:
             st.success("✅ VENTA FINALIZADA CON ÉXITO")
-            st.divider()
+            
+            # Mostramos el botón de descarga y el de nueva venta juntos
             st.download_button(
                 label="🖨️ DESCARGAR TICKET (PDF)", 
                 data=st.session_state.ticket_ready, 
                 file_name=f"ticket_{datetime.datetime.now().strftime('%H%M%S')}.pdf", 
                 mime="application/pdf",
                 use_container_width=True,
-                key="btn_descarga_final_cloud"
+                key="btn_descarga_vfinal"
             )
-            # Botón fundamental para limpiar el estado y permitir nueva venta
-            if st.button("🔄 NUEVA VENTA / FACTURA", use_container_width=True, type="primary"):
+            
+            if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="primary"):
                 st.session_state.carrito = []
-                if "ticket_ready" in st.session_state: del st.session_state.ticket_ready
+                if "ticket_ready" in st.session_state:
+                    del st.session_state.ticket_ready
                 st.rerun()
         
-        # SI NO HAY TICKET, MOSTRAMOS EL CARRITO NORMAL
+        # SI NO HAY TICKET FINALIZADO, MOSTRAMOS EL CARRITO ACTIVO
         elif st.session_state.carrito:
             total = sum(i['Subtotal'] for i in st.session_state.carrito)
             for idx, item in enumerate(st.session_state.carrito):
@@ -188,9 +196,10 @@ def mostrar_caja():
             if vuelto > 0 and metodo != "Transferencia":
                 st.success(f"**VUELTO: ${vuelto:,.0f}**")
 
-            if st.button("✅ FINALIZAR VENTA", use_container_width=True, type="primary"):
-                if not st.session_state.get('caja_abierta', False):
-                    st.error("⚠️ LA CAJA ESTÁ CERRADA.")
+            # Botón para cerrar la transacción
+            if st.button("✅ FINALIZAR Y GENERAR TICKET", use_container_width=True, type="primary"):
+                if not caja_abierta_real:
+                    st.error("⚠️ LA CAJA ESTÁ CERRADA. NO SE PUEDE FINALIZAR.")
                 else:
                     ahora = obtener_fecha_hora()
                     ventas_data = cargar_json("data/ventas_diarias.json")
@@ -206,7 +215,7 @@ def mostrar_caja():
                     with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                         json.dump(ventas_diarias, f, indent=4)
                     
-                    # GENERAR PDF Y GUARDAR EN SESSION STATE
+                    # Generar y guardar PDF en el estado para que aparezca el botón de descarga
                     pdf_bytes = generar_ticket_pdf(
                         st.session_state.carrito, total, 
                         st.session_state.usuario_data['nombre'], 
@@ -216,5 +225,10 @@ def mostrar_caja():
                     if pdf_bytes:
                         st.session_state.ticket_ready = pdf_bytes
                         st.rerun() 
+            
+            # Botón adicional por si quieren limpiar el carrito antes de vender
+            if st.button("🗑️ CANCELAR TODO", use_container_width=True):
+                st.session_state.carrito = []
+                st.rerun()
         else:
             st.info("El carrito está vacío.")
