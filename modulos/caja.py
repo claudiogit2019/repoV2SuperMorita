@@ -20,7 +20,6 @@ def cargar_json(ruta):
         if os.path.exists(ruta):
             with open(ruta, "r", encoding='utf-8') as f: 
                 content = f.read()
-                # Si es el archivo de estado, esperamos un diccionario, si no una lista
                 return json.loads(content) if content else {}
         return {}
     except: return {}
@@ -66,24 +65,19 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
 
 def mostrar_caja():
     # --- BLOQUE DE SINCRONIZACIÓN REMOTA ---
-    # Leemos el estado físico desde la carpeta data
     estado_disco = cargar_json("data/estado_caja.json")
-    
     if isinstance(estado_disco, dict) and estado_disco.get("caja_abierta", False):
         st.session_state.caja_abierta = True
         st.session_state.turno_actual = estado_disco.get("turno_actual", "S/T")
     else:
         st.session_state.caja_abierta = False
         st.session_state.turno_actual = "S/T"
-    # ---------------------------------------
 
     st.markdown("""
         <style>
             div[data-testid="InputInstructions"] { display: none; }
             .total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; line-height: 1; margin-bottom: 15px; }
-            @media (max-width: 640px) {
-                .total-grande { font-size: 2.5rem !important; }
-            }
+            @media (max-width: 640px) { .total-grande { font-size: 2.5rem !important; } }
         </style>
     """, unsafe_allow_html=True)
 
@@ -91,8 +85,7 @@ def mostrar_caja():
     st.title(f"🛒 CAJA - {t_actual}") 
 
     inv = cargar_json("data/inventario.json")
-    if not isinstance(inv, list): inv = [] # Aseguramos que el inventario sea lista
-    
+    if not isinstance(inv, list): inv = [] 
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
     # --- COMANDO DE VOZ ---
@@ -125,7 +118,6 @@ def mostrar_caja():
                 st.rerun()
 
     st.divider()
-
     col_izq, col_der = st.columns([1.1, 1])
 
     with col_izq:
@@ -171,12 +163,12 @@ def mostrar_caja():
             if vuelto > 0 and metodo != "Transferencia":
                 st.success(f"**VUELTO: ${vuelto:,.0f}**")
 
+            # --- BOTÓN FINALIZAR (CON RERUN PARA LA NUBE) ---
             if st.button("✅ FINALIZAR VENTA", use_container_width=True, type="primary"):
                 if not st.session_state.get('caja_abierta', False):
-                    st.error("⚠️ LA CAJA ESTÁ CERRADA. Ábrela en el menú.")
+                    st.error("⚠️ LA CAJA ESTÁ CERRADA.")
                 else:
                     ahora = obtener_fecha_hora()
-                    # Cargamos ventas diarias asegurando que sea una lista
                     ventas_raw = cargar_json("data/ventas_diarias.json")
                     ventas_diarias = ventas_raw if isinstance(ventas_raw, list) else []
                     
@@ -190,20 +182,28 @@ def mostrar_caja():
                     with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
                         json.dump(ventas_diarias, f, indent=4)
                     
-                    st.session_state.ticket_ready = generar_ticket_pdf(
+                    # Generar y guardar en sesión
+                    resultado_pdf = generar_ticket_pdf(
                         st.session_state.carrito, total, 
                         st.session_state.usuario_data['nombre'], 
                         p_efe, p_tra, vuelto, metodo
                     )
-                    st.success("Venta Exitosa")
+                    
+                    if resultado_pdf:
+                        st.session_state.ticket_ready = resultado_pdf
+                        st.success("Venta Exitosa")
+                        st.rerun() # Fuerza a Streamlit Cloud a mostrar el ticket
 
+            # --- SECCIÓN TICKET (CON KEY ÚNICA) ---
             if "ticket_ready" in st.session_state and st.session_state.ticket_ready:
+                st.divider()
                 st.download_button(
-                    label="🖨️ DESCARGAR TICKET", 
+                    label="🖨️ DESCARGAR TICKET (PDF)", 
                     data=st.session_state.ticket_ready, 
                     file_name=f"ticket_{datetime.datetime.now().strftime('%H%M%S')}.pdf", 
                     mime="application/pdf",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="btn_descarga_cloud" # Key fija para estabilidad
                 )
                 
                 if st.button("🔄 NUEVA VENTA", use_container_width=True):
