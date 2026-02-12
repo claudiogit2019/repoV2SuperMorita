@@ -25,6 +25,7 @@ def cargar_json(ruta):
         return {}
     except: return {}
 
+# --- FUNCIÓN INTELIGENTE UNIVERSAL (TU SOLUCIÓN) ---
 def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, metodo):
     try:
         pdf = FPDF()
@@ -45,6 +46,7 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         
         pdf.set_font("Arial", "", 10)
         for item in carrito:
+            # Usamos get para evitar errores si la clave varía
             c_v = f"{item.get('Cantidad', item.get('Cant', 1)):g}"
             pdf.cell(100, 8, str(item['Producto'])[:35], border=1)
             pdf.cell(20, 8, str(c_v), border=1)
@@ -54,77 +56,61 @@ def generar_ticket_pdf(carrito, total, vendedor, paga_efe, paga_tra, vuelto, met
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, f"TOTAL: ${total:,.0f}", ln=True, align="R")
         pdf.set_font("Arial", "", 10)
-        pdf.cell(0, 8, f"PAGO: ${paga_efe + paga_tra:,.0f} | VUELTO: ${vuelto:,.0f}", ln=True, align="R")
+        pdf.cell(0, 5, f"PAGO: ${paga_efe + paga_tra:,.0f} | VUELTO: ${vuelto:,.0f}", ln=True, align="R")
         
-        output_raw = pdf.output()
-        if isinstance(output_raw, bytearray):
-            return bytes(output_raw)
-        elif isinstance(output_raw, str):
-            return output_raw.encode('latin-1')
-        return output_raw
+        # --- ARREGLO UNIVERSAL ---
+        resultado = pdf.output() 
+        if isinstance(resultado, str):
+            return resultado.encode('latin-1')
+        return bytes(resultado)
     except Exception as e:
-        st.error(f"Error generando PDF: {e}")
+        st.error(f"Error en PDF: {e}")
         return None
 
 def mostrar_caja():
-    # --- 1. BLOQUE DE SINCRONIZACIÓN Y VALIDACIÓN DE CAJA (CORREGIDO) ---
+    # --- VALIDACIÓN DE CAJA ---
     estado_disco = cargar_json("data/estado_caja.json")
-    caja_abierta_real = False
+    caja_ok = isinstance(estado_disco, dict) and estado_disco.get("caja_abierta", False)
     
-    if isinstance(estado_disco, dict) and estado_disco.get("caja_abierta", False):
-        st.session_state.caja_abierta = True
-        st.session_state.turno_actual = estado_disco.get("turno_actual", "S/T")
-        caja_abierta_real = True
-    else:
-        st.session_state.caja_abierta = False
-        st.session_state.turno_actual = "S/T"
-
-    # Si la caja no está abierta, mostramos el mensaje de advertencia inmediatamente
-    if not caja_abierta_real:
-        st.error("⚠️ LA CAJA ESTÁ CERRADA. Por favor, abra la caja desde la Gestión de Inventario/Cierre para comenzar a vender.")
+    if not caja_ok:
+        st.error("⚠️ LA CAJA ESTÁ CERRADA. Abrir en 'Cierre de Caja' para operar.")
 
     st.markdown("""
         <style>
             div[data-testid="InputInstructions"] { display: none; }
-            .total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; line-height: 1; margin-bottom: 15px; }
-            @media (max-width: 640px) { .total-grande { font-size: 2.5rem !important; } }
+            .total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; margin-bottom: 10px; }
         </style>
     """, unsafe_allow_html=True)
 
-    t_actual = st.session_state.turno_actual
-    st.title(f"🛒 CAJA - {t_actual}") 
+    st.title(f"🛒 CAJA - {estado_disco.get('turno_actual', 'S/T')}") 
 
-    inv_data = cargar_json("data/inventario.json")
-    inv = inv_data if isinstance(inv_data, list) else []
+    inv = cargar_json("data/inventario.json")
+    if not isinstance(inv, list): inv = []
     
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
-    # --- 2. COMANDO DE VOZ ---
-    with st.expander("🎙️ PEDIDO POR VOZ"):
-        audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PROCESAR", key='mic_vfinal')
+    # --- COMANDO DE VOZ (RESTAURADO) ---
+    with st.expander("🎙️ PEDIDO POR VOZ", expanded=False):
+        audio = mic_recorder(start_prompt="🎙️ HABLAR", stop_prompt="⏹️ PROCESAR", key='voz_caja_final')
         if audio:
-            with st.spinner("Analizando..."):
-                try:
-                    res = procesar_voz_completo(audio['bytes'], json.dumps(inv))
-                    if res and "|" in res: st.session_state.entendido = res
-                    else: st.warning("No se reconoció el pedido.")
-                except Exception as e: st.error(f"Error de voz: {e}")
+            with st.spinner("Procesando..."):
+                res = procesar_voz_completo(audio['bytes'], json.dumps(inv))
+                if res and "|" in res: st.session_state.entendido = res
 
         if "entendido" in st.session_state:
-            st.info(f"**DETECTADO:**\n\n{st.session_state.entendido}")
+            st.info(f"**DETECTADO:**\n{st.session_state.entendido}")
             c1, c2 = st.columns(2)
-            if c1.button("✅ AGREGAR AL CARRITO", use_container_width=True):
+            if c1.button("✅ AGREGAR"):
                 for linea in st.session_state.entendido.split("\n"):
                     if "|" in linea:
-                        try:
-                            p = linea.split("|")
-                            nom, cant, sub = p[0].strip(), float(p[1].strip()), float(p[2].strip().replace("$","").replace(",",""))
-                            precio_u = next((item['Precio'] for item in inv if item['Producto'] == nom), sub/cant)
-                            st.session_state.carrito.append({"Producto": nom, "Precio": precio_u, "Cantidad": cant, "Subtotal": sub})
-                        except: continue
+                        p = linea.split("|")
+                        st.session_state.carrito.append({
+                            "Producto": p[0].strip(), "Cantidad": float(p[1].strip()), 
+                            "Subtotal": float(p[2].strip().replace("$","").replace(",",""))
+                        })
                 del st.session_state.entendido
                 st.rerun()
-            if c2.button("🗑️ DESCARTAR", use_container_width=True):
+            if c2.button("🗑️ DESCARTAR"):
                 del st.session_state.entendido
                 st.rerun()
 
@@ -133,102 +119,77 @@ def mostrar_caja():
 
     with col_izq:
         st.subheader("🔍 BUSCAR")
-        busq = st.text_input("Producto:", label_visibility="collapsed", placeholder="Buscar...").upper()
+        busq = st.text_input("Buscar producto:", placeholder="Ej: Coca Cola...").upper()
         if len(busq) >= 2:
             coincidencias = [p for p in inv if busq in str(p['Producto']).upper()][:12]
             for p in coincidencias:
-                c_nom, c_cant, c_add = st.columns([2, 1, 0.6])
-                c_nom.write(f"**{p['Producto']}**\n${p['Precio']:,.0f}")
-                cant_m = c_cant.number_input("Cant.", min_value=0.1, value=1.0, key=f"m_{p['Producto']}", step=1.0)
-                if c_add.button("➕", key=f"b_{p['Producto']}", use_container_width=True):
-                    st.session_state.carrito.append({"Producto": p['Producto'], "Precio": p['Precio'], "Cantidad": cant_m, "Subtotal": p['Precio'] * cant_m})
+                c_n, c_c, c_a = st.columns([2, 1, 0.6])
+                c_n.write(f"**{p['Producto']}**\n${p['Precio']:,.0f}")
+                cant = c_c.number_input("Cant.", min_value=0.1, value=1.0, key=f"q_{p['Producto']}")
+                if c_a.button("➕", key=f"add_{p['Producto']}"):
+                    st.session_state.carrito.append({"Producto": p['Producto'], "Precio": p['Precio'], "Cantidad": cant, "Subtotal": p['Precio'] * cant})
                     st.rerun()
 
     with col_der:
-        st.subheader("📋 CARRITO / FACTURA")
+        st.subheader("📋 FACTURA")
         
-        # --- 3. LÓGICA DE TICKET Y NUEVA VENTA (CORREGIDO) ---
-        if "ticket_ready" in st.session_state and st.session_state.ticket_ready:
-            st.success("✅ VENTA FINALIZADA CON ÉXITO")
-            
-            # Mostramos el botón de descarga y el de nueva venta juntos
-            st.download_button(
-                label="🖨️ DESCARGAR TICKET (PDF)", 
-                data=st.session_state.ticket_ready, 
-                file_name=f"ticket_{datetime.datetime.now().strftime('%H%M%S')}.pdf", 
-                mime="application/pdf",
-                use_container_width=True,
-                key="btn_descarga_vfinal"
-            )
-            
-            if st.button("🔄 NUEVA VENTA / LIMPIAR", use_container_width=True, type="primary"):
+        # SI HAY TICKET LISTO
+        if "ticket_ready" in st.session_state:
+            st.success("✅ VENTA GUARDADA")
+            st.download_button("🖨️ DESCARGAR TICKET", st.session_state.ticket_ready, "ticket.pdf", "application/pdf", use_container_width=True)
+            if st.button("➕ NUEVA FACTURA", type="primary", use_container_width=True):
                 st.session_state.carrito = []
-                if "ticket_ready" in st.session_state:
-                    del st.session_state.ticket_ready
+                del st.session_state.ticket_ready
                 st.rerun()
         
-        # SI NO HAY TICKET FINALIZADO, MOSTRAMOS EL CARRITO ACTIVO
+        # SI EL CARRITO TIENE PRODUCTOS
         elif st.session_state.carrito:
             total = sum(i['Subtotal'] for i in st.session_state.carrito)
             for idx, item in enumerate(st.session_state.carrito):
                 ca, cb, cc = st.columns([2.5, 1, 0.5])
-                ca.write(f"{item['Producto']} (x{item.get('Cantidad', 1):g})")
+                ca.write(f"{item['Producto']} (x{item.get('Cantidad',1):g})")
                 cb.write(f"${item['Subtotal']:,.0f}")
-                if cc.button("❌", key=f"del_{idx}"):
+                if cc.button("❌", key=f"d_{idx}"):
                     st.session_state.carrito.pop(idx)
                     st.rerun()
 
             st.divider()
-            metodo = st.radio("Método de Pago:", ["Efectivo", "Transferencia", "Ambos"], horizontal=True)
-            p_efe, p_tra, vuelto = 0.0, 0.0, 0.0
-            
-            if metodo == "Efectivo":
-                p_efe = st.number_input("Paga con $:", min_value=0.0, step=100.0, value=float(total))
-                vuelto = max(0.0, p_efe - total)
+            metodo = st.radio("Pago:", ["Efectivo", "Transferencia", "Ambos"], horizontal=True)
+            p_efe, p_tra = 0.0, 0.0
+            if metodo == "Efectivo": p_efe = st.number_input("Paga con:", value=float(total))
             elif metodo == "Transferencia": p_tra = total
             else:
-                ce, ct = st.columns(2)
-                p_efe = ce.number_input("Efectivo $:", min_value=0.0)
-                p_tra = ct.number_input("Transf. $:", min_value=0.0)
-                vuelto = max(0.0, (p_efe + p_tra) - total)
-
-            st.markdown(f'<p class="total-grande">TOTAL: ${total:,.0f}</p>', unsafe_allow_html=True)
-            if vuelto > 0 and metodo != "Transferencia":
-                st.success(f"**VUELTO: ${vuelto:,.0f}**")
-
-            # Botón para cerrar la transacción
-            if st.button("✅ FINALIZAR Y GENERAR TICKET", use_container_width=True, type="primary"):
-                if not caja_abierta_real:
-                    st.error("⚠️ LA CAJA ESTÁ CERRADA. NO SE PUEDE FINALIZAR.")
-                else:
-                    ahora = obtener_fecha_hora()
-                    ventas_data = cargar_json("data/ventas_diarias.json")
-                    ventas_diarias = ventas_data if isinstance(ventas_data, list) else []
-                    
-                    ventas_diarias.append({
-                        "fecha": ahora.strftime("%Y-%m-%d"), "hora": ahora.strftime("%H:%M:%S"),
-                        "vendedor": st.session_state.usuario_data['nombre'],
-                        "turno": st.session_state.turno_actual,
-                        "total": total, "metodo": metodo, "detalle": st.session_state.carrito
-                    })
-                    
-                    with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
-                        json.dump(ventas_diarias, f, indent=4)
-                    
-                    # Generar y guardar PDF en el estado para que aparezca el botón de descarga
-                    pdf_bytes = generar_ticket_pdf(
-                        st.session_state.carrito, total, 
-                        st.session_state.usuario_data['nombre'], 
-                        p_efe, p_tra, vuelto, metodo
-                    )
-                    
-                    if pdf_bytes:
-                        st.session_state.ticket_ready = pdf_bytes
-                        st.rerun() 
+                c_e, c_t = st.columns(2)
+                p_efe = c_e.number_input("Efe:")
+                p_tra = c_t.number_input("Transf:")
             
-            # Botón adicional por si quieren limpiar el carrito antes de vender
-            if st.button("🗑️ CANCELAR TODO", use_container_width=True):
+            vuelto = max(0.0, (p_efe + p_tra) - total)
+            st.markdown(f'<p class="total-grande">TOTAL: ${total:,.0f}</p>', unsafe_allow_html=True)
+            if vuelto > 0: st.success(f"Vuelto: ${vuelto:,.0f}")
+
+            if st.button("✅ FINALIZAR VENTA", type="primary", use_container_width=True):
+                if not caja_ok:
+                    st.error("LA CAJA ESTÁ CERRADA")
+                else:
+                    # Guardar en JSON
+                    v_raw = cargar_json("data/ventas_diarias.json")
+                    ventas = v_raw if isinstance(v_raw, list) else []
+                    ventas.append({
+                        "fecha": obtener_fecha_hora().strftime("%Y-%m-%d"),
+                        "vendedor": st.session_state.usuario_data['nombre'],
+                        "total": total, "detalle": st.session_state.carrito
+                    })
+                    with open("data/ventas_diarias.json", "w", encoding='utf-8') as f:
+                        json.dump(ventas, f, indent=4)
+                    
+                    # Generar Ticket con tu solución inteligente
+                    pdf = generar_ticket_pdf(st.session_state.carrito, total, st.session_state.usuario_data['nombre'], p_efe, p_tra, vuelto, metodo)
+                    if pdf:
+                        st.session_state.ticket_ready = pdf
+                        st.rerun()
+            
+            if st.button("🗑️ LIMPIAR TODO"):
                 st.session_state.carrito = []
                 st.rerun()
         else:
-            st.info("El carrito está vacío.")
+            st.info("Carrito vacío")
