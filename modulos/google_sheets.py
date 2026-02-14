@@ -9,7 +9,7 @@ def conectar_google_sheets():
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         # Asegúrate que el nombre sea el del archivo CONVERTIDO (sin .xlsx)
-        sheet = client.open("stock_morita_2026-02-14").sheet1
+        sheet = client.open("Morita_DB").sheet1
         return sheet
     except:
         return None
