@@ -46,7 +46,6 @@ def generar_ticket_pdf(items, total, paga_efe, paga_tra, vuelto, vendedor, metod
         pdf.set_font("Arial", '', 10)
         for i in items:
             c = i.get('Cantidad', i.get('Cant', 1))
-            # Limpieza de caracteres para evitar errores de encoding
             nombre = str(i['Producto'])[:30].encode('latin-1', 'ignore').decode('latin-1')
             pdf.cell(90, 8, nombre)
             pdf.cell(30, 8, f"{c:g}")
@@ -80,7 +79,13 @@ def mostrar_caja():
     st.markdown("<style>.total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; }</style>", unsafe_allow_html=True)
     st.title(f"🛒 CAJA - {turno_actual}") 
 
-    inv = cargar_json("data/inventario.json")
+    # --- CARGA QUIRÚRGICA DEL INVENTARIO ---
+    datos_google = obtener_inventario_google()
+    if datos_google:
+        inv = datos_google
+    else:
+        inv = cargar_json("data/inventario.json")
+
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
     # --- COMANDO DE VOZ ---
@@ -122,7 +127,6 @@ def mostrar_caja():
     with col_der:
         st.subheader("📋 FACTURA")
         
-        # PERSISTENCIA DEL TICKET DESPUÉS DE FINALIZAR
         if "venta_hecha" in st.session_state:
             st.success("✅ VENTA REGISTRADA")
             st.download_button("🖨️ DESCARGAR TICKET PDF", data=st.session_state.pdf_cache, file_name="ticket.pdf", mime="application/pdf", use_container_width=True)
@@ -149,7 +153,7 @@ def mostrar_caja():
                 p_efe = st.number_input("Paga con $:", value=float(total))
             elif metodo == "Transferencia":
                 p_tra = total
-            else: # AMBOS (Aquí recuperamos los dos campos)
+            else: # AMBOS
                 c1, c2 = st.columns(2)
                 p_efe = c1.number_input("Monto Efectivo $:")
                 p_tra = c2.number_input("Monto Transferencia $:")
@@ -162,7 +166,6 @@ def mostrar_caja():
                 if not caja_abierta:
                     st.error("LA CAJA ESTÁ CERRADA")
                 else:
-                    # 1. Guardar en JSON
                     ventas = cargar_json("data/ventas_diarias.json")
                     if not isinstance(ventas, list): ventas = []
                     nueva_v = {
@@ -174,7 +177,6 @@ def mostrar_caja():
                     ventas.append(nueva_v)
                     guardar_json("data/ventas_diarias.json", ventas)
                     
-                    # 2. Generar PDF para el botón de descarga
                     pdf = generar_ticket_pdf(st.session_state.carrito, total, p_efe, p_tra, vuelto, st.session_state.usuario_data.get('nombre', 'Pamela'), metodo)
                     
                     st.session_state.pdf_cache = pdf
@@ -186,4 +188,3 @@ def mostrar_caja():
                 st.rerun()
         else:
             st.info("Carrito vacío")
-
