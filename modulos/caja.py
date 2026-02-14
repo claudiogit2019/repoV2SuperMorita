@@ -6,7 +6,8 @@ import os
 from fpdf import FPDF
 import io
 from streamlit_mic_recorder import mic_recorder
-from gemini_service import procesar_voz_completo 
+from gemini_service import procesar_voz_completo
+from modulos.google_sheets import obtener_inventario_google
 
 # --- FUNCIONES DE APOYO ---
 def obtener_fecha_hora():
