@@ -6,3 +6,5 @@ python-dotenv
 streamlit-mic-recorder
 xlsxwriter
 openpyxl
+gspread
+google-auth
