@@ -17,12 +17,9 @@ def cargar_json():
     if not os.path.exists("data"):
         os.makedirs("data")
     try:
-        # Prioridad: Intentamos traer de Google Sheets
         datos_google = obtener_inventario_google()
         if datos_google:
             return datos_google
-            
-        # Respaldo: Si Google falla, cargamos local
         if os.path.exists(ruta):
             with open(ruta, "r", encoding='utf-8') as f:
                 return json.load(f)
@@ -34,7 +31,7 @@ def guardar_json(datos):
         json.dump(datos, f, indent=4)
 
 def mostrar_abm():
-    st.title("📦 PRODUCTOS") 
+    st.title("📦 GESTIÓN DE PRODUCTOS") 
     inv = cargar_json()
     
     tab1, tab2, tab3, tab4 = st.tabs(["➕ ALTA", "✏️ MODIFICACIÓN", "🗑️ BAJA", "📈 STOCK"])
@@ -43,27 +40,29 @@ def mostrar_abm():
     with tab1:
         st.subheader("Cargar Nuevo Producto")
         with st.form("form_alta", clear_on_submit=True):
+            # Agregamos campo Código
+            codigo = st.text_input("Código de Barras (Scanner)", key="input_alta_cod").strip()
             nombre = st.text_input("Nombre del Producto", key="input_alta_nom").upper().strip()
             precio = st.number_input("Precio", min_value=0.0, step=100.0, key="input_alta_pre")
             
             c1, c2 = st.columns(2)
             if c1.form_submit_button("✅ CARGAR"):
-                if nombre:
-                    if any(p['Producto'] == nombre for p in inv):
+                if nombre and codigo:
+                    # Verificamos duplicados por código o nombre
+                    if any(str(p.get('Codigo')) == codigo for p in inv):
+                        st.error(f"❌ El código {codigo} ya existe.")
+                    elif any(p['Producto'] == nombre for p in inv):
                         st.error(f"❌ El producto {nombre} ya existe.")
                     else:
-                        # 1. Sincronizar con Google
-                        exito = agregar_producto_google(nombre, precio)
-                        if exito:
-                            # 2. Guardar Local
-                            inv.append({"Producto": nombre, "Precio": precio})
+                        if agregar_producto_google(codigo, nombre, precio):
+                            inv.append({"Codigo": codigo, "Producto": nombre, "Precio": precio})
                             guardar_json(inv)
-                            st.success(f"✅ PRODUCTO EN NUBE: {nombre} agregado con éxito.")
+                            st.success(f"✅ PRODUCTO CARGADO: {nombre}")
                             st.rerun()
                         else:
-                            st.error("❌ Error de conexión con Google Sheets.")
+                            st.error("❌ Error al sincronizar con Google.")
                 else:
-                    st.error("⚠️ Ingrese un nombre válido.")
+                    st.error("⚠️ Ingrese Código y Nombre.")
             
             if c2.form_submit_button("🧹 LIMPIAR"):
                 st.rerun()
@@ -72,27 +71,25 @@ def mostrar_abm():
     with tab2:
         st.subheader("Editar Producto Existente")
         nombres_prod = sorted([p['Producto'] for p in inv])
-        seleccion = st.selectbox("Seleccione el producto a modificar:", ["---"] + nombres_prod)
+        seleccion = st.selectbox("Seleccione para modificar:", ["---"] + nombres_prod)
         
         if seleccion != "---":
             prod_actual = next(p for p in inv if p['Producto'] == seleccion)
-            
             with st.form("form_modificar"):
-                nuevo_nombre = st.text_input("Nombre", value=prod_actual['Producto']).upper().strip()
-                nuevo_precio = st.number_input("Precio", value=float(prod_actual['Precio']), min_value=0.0, step=100.0)
+                nuevo_cod = st.text_input("Código", value=str(prod_actual.get('Codigo', ''))).strip()
+                nuevo_nom = st.text_input("Nombre", value=prod_actual['Producto']).upper().strip()
+                nuevo_pre = st.number_input("Precio", value=float(prod_actual['Precio']), min_value=0.0)
                 
                 c1, c2 = st.columns(2)
-                if c1.form_submit_button("💾 GUARDAR CAMBIOS"):
-                    # 1. Editar en Google
-                    if editar_producto_google(seleccion, nuevo_nombre, nuevo_precio):
-                        # 2. Editar Local
+                if c1.form_submit_button("💾 GUARDAR"):
+                    if editar_producto_google(seleccion, nuevo_cod, nuevo_nom, nuevo_pre):
                         inv = [p for p in inv if p['Producto'] != seleccion]
-                        inv.append({"Producto": nuevo_nombre, "Precio": nuevo_precio})
+                        inv.append({"Codigo": nuevo_cod, "Producto": nuevo_nom, "Precio": nuevo_pre})
                         guardar_json(inv)
-                        st.success(f"✅ MODIFICADO EN NUBE: {seleccion} actualizado.")
+                        st.success("✅ Cambios guardados")
                         st.rerun()
                     else:
-                        st.error("❌ No se pudo actualizar en Google Sheets.")
+                        st.error("❌ Error en Google Sheets")
                 
                 if c2.form_submit_button("🧹 CANCELAR"):
                     st.rerun()
@@ -100,48 +97,39 @@ def mostrar_abm():
     # --- TAB 3: BAJA ---
     with tab3:
         st.subheader("Eliminar Producto")
-        if inv:
-            eliminar = st.selectbox("Seleccione producto para borrar:", ["---"] + sorted([p['Producto'] for p in inv]))
-            if eliminar != "---":
-                st.warning(f"¿Está seguro de que desea eliminar '{eliminar}'?")
-                if st.button("🗑️ SÍ, ELIMINAR DEFINITIVAMENTE"):
-                    # 1. Borrar en Google
-                    if borrar_producto_google(eliminar):
-                        # 2. Borrar Local
-                        inv = [p for p in inv if p['Producto'] != eliminar]
-                        guardar_json(inv)
-                        st.success(f"✅ ELIMINADO EN NUBE: {eliminar} fue borrado.")
-                        st.rerun()
-                    else:
-                        st.error("❌ Error al borrar en Google Sheets.")
-        else:
-            st.info("No hay productos en el sistema.")
+        eliminar = st.selectbox("Seleccione producto:", ["---"] + sorted([p['Producto'] for p in inv]))
+        if eliminar != "---":
+            st.warning(f"¿Eliminar '{eliminar}'?")
+            if st.button("🗑️ SÍ, ELIMINAR"):
+                if borrar_producto_google(eliminar):
+                    inv = [p for p in inv if p['Producto'] != eliminar]
+                    guardar_json(inv)
+                    st.success("✅ Eliminado")
+                    st.rerun()
+                else:
+                    st.error("❌ Error en Google Sheets")
 
-    # --- TAB 4: STOCK ---
+    # --- TAB 4: STOCK Y EXPORTACIÓN ---
     with tab4:
-        st.subheader("Gestión de Stock (Sincronizado con Google)")
-        # Forzamos recarga de Google para ver que todo esté igual
-        inv_real = obtener_inventario_google()
-        df_inv = pd.DataFrame(inv_real if inv_real else inv)
+        st.subheader("Gestión de Stock")
+        df_inv = pd.DataFrame(obtener_inventario_google() or inv)
         
         if not df_inv.empty:
+            # Reordenar para ver Código primero
+            cols = ['Codigo', 'Producto', 'Precio']
+            df_inv = df_inv[cols] if all(c in df_inv.columns for c in cols) else df_inv
             st.dataframe(df_inv.sort_values(by="Producto"), use_container_width=True)
             
             st.divider()
-            col_ex1, col_ex2 = st.columns(2)
-            
-            with col_ex1:
-                st.write("### 📥 Descargar")
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                    df_inv.to_excel(writer, index=False)
-                st.download_button(
-                    label="DESCARGAR EXCEL DE STOCK",
-                    data=buffer.getvalue(),
-                    file_name=f"stock_morita_{datetime.date.today()}.xlsx",
-                    mime="application/vnd.ms-excel",
-                    use_container_width=True
-                )
+            st.write("### 📥 Descargar Reporte")
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df_inv.to_excel(writer, index=False)
+            st.download_button(
+                label="DESCARGAR EXCEL",
+                data=buffer.getvalue(),
+                file_name=f"stock_morita_{datetime.date.today()}.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True
+            )
 
-            with col_ex2:
-                st.info("💡 Los cambios realizados en las pestañas anteriores se reflejan automáticamente en tu Google Sheet.")
