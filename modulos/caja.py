@@ -79,14 +79,35 @@ def mostrar_caja():
     st.markdown("<style>.total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; }</style>", unsafe_allow_html=True)
     st.title(f"🛒 CAJA - {turno_actual}") 
 
-    # --- CARGA QUIRÚRGICA DEL INVENTARIO ---
+    # --- CARGA DEL INVENTARIO ---
     datos_google = obtener_inventario_google()
-    if datos_google:
-        inv = datos_google
-    else:
-        inv = cargar_json("data/inventario.json")
+    inv = datos_google if datos_google else cargar_json("data/inventario.json")
 
     if 'carrito' not in st.session_state: st.session_state.carrito = []
+
+    # --- NUEVA SECCIÓN: SCANNER DE CÓDIGO DE BARRAS ---
+    # Este campo debe estar siempre arriba para acceso rápido
+    with st.container():
+        cod_input = st.text_input("🚀 ESCANEAR PRODUCTO (Pistolear)", key="scanner_input", placeholder="Esperando código...").strip()
+        if cod_input:
+            # Buscamos el código en el inventario (convertimos a string para comparar)
+            match = next((p for p in inv if str(p.get('Codigo')) == cod_input), None)
+            if match:
+                try:
+                    precio_f = float(match.get('Precio', 0))
+                except:
+                    precio_f = 0.0
+                
+                st.session_state.carrito.append({
+                    "Producto": match['Producto'], 
+                    "Precio": precio_f, 
+                    "Cantidad": 1.0, 
+                    "Subtotal": precio_f
+                })
+                st.toast(f"✅ {match['Producto']} agregado") # Notificación rápida
+                st.rerun() # Recarga para limpiar el input y mostrar en carrito
+            else:
+                st.error(f"❌ Código {cod_input} no encontrado.")
 
     # --- COMANDO DE VOZ ---
     with st.expander("🎙️ PEDIDO POR VOZ"):
@@ -112,16 +133,27 @@ def mostrar_caja():
     col_izq, col_der = st.columns([1, 1.2])
 
     with col_izq:
-        st.subheader("🔍 BUSCAR")
-        busq = st.text_input("Producto:", key="busq").upper()
+        st.subheader("🔍 BUSCAR MANUAL")
+        busq = st.text_input("Producto o Marca:", key="busq").upper()
         if len(busq) >= 2:
             coincidencias = [p for p in inv if busq in str(p['Producto']).upper()][:12]
             for p in coincidencias:
+                # Protección de precio para el buscador manual
+                try:
+                    p_precio = float(p.get('Precio', 0)) if p.get('Precio') not in ["", None] else 0.0
+                except:
+                    p_precio = 0.0
+
                 cn, cc, ca = st.columns([2, 1, 0.6])
-                cn.write(f"**{p['Producto']}**\n${p['Precio']:,.0f}")
+                cn.write(f"**{p['Producto']}**\n${p_precio:,.0f}")
                 cant_m = cc.number_input("Cant.", min_value=0.1, value=1.0, key=f"k_{p['Producto']}")
                 if ca.button("➕", key=f"add_{p['Producto']}"):
-                    st.session_state.carrito.append({"Producto": p['Producto'], "Precio": p['Precio'], "Cantidad": cant_m, "Subtotal": p['Precio'] * cant_m})
+                    st.session_state.carrito.append({
+                        "Producto": p['Producto'], 
+                        "Precio": p_precio, 
+                        "Cantidad": cant_m, 
+                        "Subtotal": p_precio * cant_m
+                    })
                     st.rerun()
 
     with col_der:
