@@ -26,6 +26,17 @@ def guardar_json(ruta, datos):
     with open(ruta, "w", encoding='utf-8') as f:
         json.dump(datos, f, indent=4, ensure_ascii=False)
 
+# --- CARGA CON CACHÉ (Evita el error de Cuota de Google) ---
+@st.cache_data(ttl=600)  # Guarda en memoria por 10 minutos
+def cargar_inventario_caja():
+    try:
+        datos_google = obtener_inventario_google()
+        if datos_google:
+            return datos_google
+    except:
+        pass
+    return cargar_json("data/inventario.json")
+
 # --- GENERADOR DE PDF ---
 def generar_ticket_pdf(items, total, paga_efe, paga_tra, vuelto, vendedor, metodo):
     try:
@@ -79,19 +90,17 @@ def mostrar_caja():
     st.markdown("<style>.total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; }</style>", unsafe_allow_html=True)
     st.title(f"🛒 CAJA - {turno_actual}") 
 
-    # --- CARGA DEL INVENTARIO ---
-    datos_google = obtener_inventario_google()
-    inv = datos_google if datos_google else cargar_json("data/inventario.json")
+    # --- CARGA DEL INVENTARIO USANDO CACHÉ ---
+    inv = cargar_inventario_caja()
 
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
-    # --- NUEVA SECCIÓN: SCANNER DE CÓDIGO DE BARRAS ---
-    # Este campo debe estar siempre arriba para acceso rápido
+    # --- SCANNER DE CÓDIGO DE BARRAS ---
     with st.container():
-        cod_input = st.text_input("🚀 ESCANEAR PRODUCTO (Pistolear)", key="scanner_input", placeholder="Esperando código...").strip()
+        cod_input = st.text_input("🚀 ESCANEAR PRODUCTO", key="scanner_input", placeholder="Pistolear aquí...").strip()
         if cod_input:
-            # Buscamos el código en el inventario (convertimos a string para comparar)
-            match = next((p for p in inv if str(p.get('Codigo')) == cod_input), None)
+            # Buscamos ignorando espacios y asegurando que sea string
+            match = next((p for p in inv if str(p.get('Codigo', '')).strip() == cod_input), None)
             if match:
                 try:
                     precio_f = float(match.get('Precio', 0))
@@ -104,10 +113,10 @@ def mostrar_caja():
                     "Cantidad": 1.0, 
                     "Subtotal": precio_f
                 })
-                st.toast(f"✅ {match['Producto']} agregado") # Notificación rápida
-                st.rerun() # Recarga para limpiar el input y mostrar en carrito
+                st.toast(f"✅ {match['Producto']} agregado")
+                st.rerun() 
             else:
-                st.error(f"❌ Código {cod_input} no encontrado.")
+                st.error(f"❌ Código {cod_input} no registrado.")
 
     # --- COMANDO DE VOZ ---
     with st.expander("🎙️ PEDIDO POR VOZ"):
@@ -138,7 +147,6 @@ def mostrar_caja():
         if len(busq) >= 2:
             coincidencias = [p for p in inv if busq in str(p['Producto']).upper()][:12]
             for p in coincidencias:
-                # Protección de precio para el buscador manual
                 try:
                     p_precio = float(p.get('Precio', 0)) if p.get('Precio') not in ["", None] else 0.0
                 except:
