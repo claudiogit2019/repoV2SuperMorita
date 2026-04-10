@@ -32,18 +32,16 @@ def cargar_inventario_caja():
     try:
         datos_google = obtener_inventario_google()
         if datos_google:
-            # Guardamos copia local por si falla Google después
             guardar_json("data/inventario.json", datos_google)
             return datos_google
     except:
         pass
     return cargar_json("data/inventario.json")
 
-# --- LÓGICA DE ESCANEO (EVITA DUPLICADOS) ---
+# --- LÓGICA DE ESCANEO (CON AGRUPACIÓN DE PRODUCTOS) ---
 def procesar_escaneo():
     codigo = st.session_state.scanner_input.strip()
     if codigo:
-        # Cargamos el inventario (usa el caché)
         inv = cargar_inventario_caja()
         
         def normalizar(v):
@@ -54,7 +52,8 @@ def procesar_escaneo():
         
         if match:
             try:
-                precio_raw = str(match.get('Precio', 0)).replace(',', '.')
+                # Limpiamos el precio por si viene con formatos raros
+                precio_raw = str(match.get('Precio', 0)).replace('$', '').replace('.', '').replace(',', '.')
                 precio_f = float(precio_raw)
             except:
                 precio_f = 0.0
@@ -62,17 +61,26 @@ def procesar_escaneo():
             if 'carrito' not in st.session_state:
                 st.session_state.carrito = []
             
-            st.session_state.carrito.append({
-                "Producto": match['Producto'], 
-                "Precio": precio_f, 
-                "Cantidad": 1.0, 
-                "Subtotal": precio_f
-            })
-            st.toast(f"✅ {match['Producto']} agregado")
+            # --- LÓGICA DE AGRUPACIÓN ---
+            # Buscamos si el producto ya está en el carrito para sumar cantidad en vez de repetir fila
+            item_existente = next((item for item in st.session_state.carrito if item['Producto'] == match['Producto']), None)
+            
+            if item_existente:
+                item_existente['Cantidad'] += 1.0
+                item_existente['Subtotal'] = item_existente['Cantidad'] * item_existente['Precio']
+                st.toast(f"➕ Sumado: {match['Producto']} (Total: {item_existente['Cantidad']:g})")
+            else:
+                st.session_state.carrito.append({
+                    "Producto": match['Producto'], 
+                    "Precio": precio_f, 
+                    "Cantidad": 1.0, 
+                    "Subtotal": precio_f
+                })
+                st.toast(f"✅ {match['Producto']} agregado")
         else:
             st.error(f"❌ Código '{codigo}' no registrado.")
         
-        # LIMPIEZA: Borramos el input para el próximo escaneo
+        # Limpiamos el campo para que quede listo para el próximo producto
         st.session_state.scanner_input = ""
 
 # --- GENERADOR DE PDF ---
@@ -94,7 +102,7 @@ def generar_ticket_pdf(items, total, paga_efe, paga_tra, vuelto, vendedor, metod
         
         pdf.set_font("Arial", '', 10)
         for i in items:
-            c = i.get('Cantidad', i.get('Cant', 1))
+            c = i.get('Cantidad', 1)
             nombre = str(i['Producto'])[:30].encode('latin-1', 'ignore').decode('latin-1')
             pdf.cell(90, 8, nombre)
             pdf.cell(30, 8, f"{c:g}")
@@ -124,7 +132,7 @@ def mostrar_caja():
     inv = cargar_inventario_caja()
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
-    # --- SCANNER DE CÓDIGO DE BARRAS (MODO ON_CHANGE) ---
+    # --- SCANNER DE CÓDIGO DE BARRAS ---
     with st.container():
         st.text_input(
             "🚀 ESCANEAR PRODUCTO", 
@@ -171,12 +179,16 @@ def mostrar_caja():
                 cn.write(f"**{p['Producto']}**\n${p_precio:,.0f}")
                 cant_m = cc.number_input("Cant.", min_value=0.1, value=1.0, key=f"k_{p['Producto']}")
                 if ca.button("➕", key=f"add_{p['Producto']}"):
-                    st.session_state.carrito.append({
-                        "Producto": p['Producto'], 
-                        "Precio": p_precio, 
-                        "Cantidad": cant_m, 
-                        "Subtotal": p_precio * cant_m
-                    })
+                    # También aplicamos la agrupación en la carga manual
+                    item_existente = next((item for item in st.session_state.carrito if item['Producto'] == p['Producto']), None)
+                    if item_existente:
+                        item_existente['Cantidad'] += cant_m
+                        item_existente['Subtotal'] = item_existente['Cantidad'] * item_existente['Precio']
+                    else:
+                        st.session_state.carrito.append({
+                            "Producto": p['Producto'], "Precio": p_precio, 
+                            "Cantidad": cant_m, "Subtotal": p_precio * cant_m
+                        })
                     st.rerun()
 
     with col_der:
