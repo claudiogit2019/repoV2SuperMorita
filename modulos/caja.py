@@ -26,16 +26,54 @@ def guardar_json(ruta, datos):
     with open(ruta, "w", encoding='utf-8') as f:
         json.dump(datos, f, indent=4, ensure_ascii=False)
 
-# --- CARGA CON CACHÉ (Evita el error de Cuota de Google y da velocidad) ---
-@st.cache_data(ttl=600)  # Guarda en memoria por 10 minutos
+# --- CARGA CON CACHÉ (10 minutos para estabilidad) ---
+@st.cache_data(ttl=600)
 def cargar_inventario_caja():
     try:
         datos_google = obtener_inventario_google()
         if datos_google:
+            # Guardamos copia local por si falla Google después
+            guardar_json("data/inventario.json", datos_google)
             return datos_google
     except:
         pass
     return cargar_json("data/inventario.json")
+
+# --- LÓGICA DE ESCANEO (EVITA DUPLICADOS) ---
+def procesar_escaneo():
+    codigo = st.session_state.scanner_input.strip()
+    if codigo:
+        # Cargamos el inventario (usa el caché)
+        inv = cargar_inventario_caja()
+        
+        def normalizar(v):
+            res = str(v).strip()
+            return res[:-2] if res.endswith('.0') else res
+
+        match = next((p for p in inv if normalizar(p.get('Codigo', '')) == normalizar(codigo)), None)
+        
+        if match:
+            try:
+                precio_raw = str(match.get('Precio', 0)).replace(',', '.')
+                precio_f = float(precio_raw)
+            except:
+                precio_f = 0.0
+            
+            if 'carrito' not in st.session_state:
+                st.session_state.carrito = []
+            
+            st.session_state.carrito.append({
+                "Producto": match['Producto'], 
+                "Precio": precio_f, 
+                "Cantidad": 1.0, 
+                "Subtotal": precio_f
+            })
+            st.toast(f"✅ {match['Producto']} agregado")
+        else:
+            st.error(f"❌ Código '{codigo}' no registrado.")
+        
+        # LIMPIEZA: Borramos el input para el próximo escaneo
+        st.session_state.scanner_input = ""
 
 # --- GENERADOR DE PDF ---
 def generar_ticket_pdf(items, total, paga_efe, paga_tra, vuelto, vendedor, metodo):
@@ -66,13 +104,6 @@ def generar_ticket_pdf(items, total, paga_efe, paga_tra, vuelto, vendedor, metod
         pdf.set_font("Arial", 'B', 14)
         pdf.cell(130, 10, "TOTAL:", align='R'); pdf.cell(60, 10, f"${total:,.0f}", ln=True, align='R')
         
-        pdf.set_font("Arial", '', 10)
-        pdf.cell(130, 7, f"METODO: {metodo}", align='R', ln=True)
-        pdf.cell(130, 7, f"EFECTIVO: ${paga_efe:,.0f}", align='R', ln=True)
-        pdf.cell(130, 7, f"TRANSFERENCIA: ${paga_tra:,.0f}", align='R', ln=True)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(130, 10, "VUELTO:", align='R'); pdf.cell(60, 10, f"${vuelto:,.0f}", ln=True, align='R')
-        
         return pdf.output(dest='S').encode('latin-1')
     except Exception as e:
         st.error(f"Error PDF: {e}")
@@ -90,43 +121,17 @@ def mostrar_caja():
     st.markdown("<style>.total-grande { font-size: 3.5rem !important; font-weight: bold; color: #D32F2F; text-align: right; }</style>", unsafe_allow_html=True)
     st.title(f"🛒 CAJA - {turno_actual}") 
 
-    # --- CARGA DEL INVENTARIO USANDO CACHÉ ---
     inv = cargar_inventario_caja()
-
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
-    # --- SCANNER DE CÓDIGO DE BARRAS (VERSIÓN NORMALIZADA) ---
+    # --- SCANNER DE CÓDIGO DE BARRAS (MODO ON_CHANGE) ---
     with st.container():
-        cod_input = st.text_input("🚀 ESCANEAR PRODUCTO", key="scanner_input", placeholder="Pistolear aquí...").strip()
-        
-        if cod_input:
-            # Función interna para limpiar los datos y que coincidan siempre
-            def normalizar_codigo(val):
-                v = str(val).strip()
-                if v.endswith('.0'): v = v[:-2]
-                return v
-
-            # Buscamos el código comparando strings normalizados
-            match = next((p for p in inv if normalizar_codigo(p.get('Codigo', '')) == normalizar_codigo(cod_input)), None)
-            
-            if match:
-                try:
-                    # Limpiamos el precio por si viene con comas de la planilla
-                    precio_raw = str(match.get('Precio', 0)).replace('$', '').replace('.', '').replace(',', '.')
-                    precio_f = float(precio_raw)
-                except:
-                    precio_f = 0.0
-                
-                st.session_state.carrito.append({
-                    "Producto": match['Producto'], 
-                    "Precio": precio_f, 
-                    "Cantidad": 1.0, 
-                    "Subtotal": precio_f
-                })
-                st.toast(f"✅ {match['Producto']} agregado")
-                st.rerun() 
-            else:
-                st.error(f"❌ Código '{cod_input}' no registrado.")
+        st.text_input(
+            "🚀 ESCANEAR PRODUCTO", 
+            key="scanner_input", 
+            on_change=procesar_escaneo, 
+            placeholder="Pistolear aquí o escribir y Enter..."
+        )
 
     # --- COMANDO DE VOZ ---
     with st.expander("🎙️ PEDIDO POR VOZ"):
