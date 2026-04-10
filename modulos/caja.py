@@ -26,7 +26,7 @@ def guardar_json(ruta, datos):
     with open(ruta, "w", encoding='utf-8') as f:
         json.dump(datos, f, indent=4, ensure_ascii=False)
 
-# --- CARGA CON CACHÉ (Evita el error de Cuota de Google) ---
+# --- CARGA CON CACHÉ (Evita el error de Cuota de Google y da velocidad) ---
 @st.cache_data(ttl=600)  # Guarda en memoria por 10 minutos
 def cargar_inventario_caja():
     try:
@@ -95,15 +95,25 @@ def mostrar_caja():
 
     if 'carrito' not in st.session_state: st.session_state.carrito = []
 
-    # --- SCANNER DE CÓDIGO DE BARRAS ---
+    # --- SCANNER DE CÓDIGO DE BARRAS (VERSIÓN NORMALIZADA) ---
     with st.container():
         cod_input = st.text_input("🚀 ESCANEAR PRODUCTO", key="scanner_input", placeholder="Pistolear aquí...").strip()
+        
         if cod_input:
-            # Buscamos ignorando espacios y asegurando que sea string
-            match = next((p for p in inv if str(p.get('Codigo', '')).strip() == cod_input), None)
+            # Función interna para limpiar los datos y que coincidan siempre
+            def normalizar_codigo(val):
+                v = str(val).strip()
+                if v.endswith('.0'): v = v[:-2]
+                return v
+
+            # Buscamos el código comparando strings normalizados
+            match = next((p for p in inv if normalizar_codigo(p.get('Codigo', '')) == normalizar_codigo(cod_input)), None)
+            
             if match:
                 try:
-                    precio_f = float(match.get('Precio', 0))
+                    # Limpiamos el precio por si viene con comas de la planilla
+                    precio_raw = str(match.get('Precio', 0)).replace('$', '').replace('.', '').replace(',', '.')
+                    precio_f = float(precio_raw)
                 except:
                     precio_f = 0.0
                 
@@ -116,7 +126,7 @@ def mostrar_caja():
                 st.toast(f"✅ {match['Producto']} agregado")
                 st.rerun() 
             else:
-                st.error(f"❌ Código {cod_input} no registrado.")
+                st.error(f"❌ Código '{cod_input}' no registrado.")
 
     # --- COMANDO DE VOZ ---
     with st.expander("🎙️ PEDIDO POR VOZ"):
@@ -148,7 +158,7 @@ def mostrar_caja():
             coincidencias = [p for p in inv if busq in str(p['Producto']).upper()][:12]
             for p in coincidencias:
                 try:
-                    p_precio = float(p.get('Precio', 0)) if p.get('Precio') not in ["", None] else 0.0
+                    p_precio = float(str(p.get('Precio', 0)).replace(',', '.'))
                 except:
                     p_precio = 0.0
 
