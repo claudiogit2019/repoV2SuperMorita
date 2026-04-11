@@ -27,7 +27,7 @@ def guardar_json(ruta, datos):
         json.dump(datos, f, indent=4, ensure_ascii=False)
 
 # --- CARGA CON CACHÉ (10 minutos para estabilidad) ---
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def cargar_inventario_caja():
     try:
         datos_google = obtener_inventario_google()
