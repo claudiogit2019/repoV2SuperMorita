@@ -21,24 +21,23 @@ def obtener_inventario_google():
         if not sheet:
             return None
         
-        # CAMBIO CLAVE: Obtenemos todos los valores como matriz simple [filas][columnas]
-        # Esto evita que gspread intente "adivinar" las columnas si hay huecos.
-        lista_de_listas = sheet.get_all_values()
+        # Leemos el rango exacto A:C para ignorar cualquier columna "basura" a la derecha
+        # Esto soluciona que el sistema lea celdas vacías como códigos
+        lista_de_listas = sheet.get("A2:C5000")
         
-        if len(lista_de_listas) <= 1:
+        if not lista_de_listas:
             return []
 
         inventario_limpio = []
-        # Saltamos la primera fila (encabezados)
-        for fila in lista_de_listas[1:]:
-            # Aseguramos que la fila tenga al menos 3 columnas para evitar errores de índice
+        for fila in lista_de_listas:
+            # Rellenamos con vacíos si la fila está incompleta en Sheets
             while len(fila) < 3:
                 fila.append("")
             
-            # Mapeo manual estricto: A=0, B=1, C=2
+            # Mapeo manual estricto: A=0 (Codigo), B=1 (Producto), C=2 (Precio)
             inventario_limpio.append({
                 "Codigo": str(fila[0]).strip(),
-                "Producto": str(fila[1]).strip(),
+                "Producto": str(fila[1]).strip().upper(),
                 "Precio": fila[2] if fila[2] else 0
             })
         
@@ -51,21 +50,29 @@ def agregar_producto_google(codigo, producto, precio):
     try:
         sheet = conectar_google_sheets()
         if sheet:
-            # Forzamos el orden: A: Código, B: Producto, C: Precio
-            # Usamos value_input_option='USER_ENTERED' para que Google Sheets 
-            # reconozca los números como números y no como texto.
-            nueva_fila = [str(codigo), str(producto).upper(), precio]
-            sheet.append_row(nueva_fila, value_input_option='USER_ENTERED')
+            # 1. Buscamos la primera fila realmente vacía basándonos en la columna B (Producto)
+            # Esto evita que se salte filas o se corra si hay basura en la columna A
+            col_producto = sheet.col_values(2)
+            proxima_fila = len(col_producto) + 1
+            
+            # 2. Definimos el rango exacto para asegurar A, B y C
+            rango = f"A{proxima_fila}:C{proxima_fila}"
+            
+            # 3. Preparamos los datos
+            valores = [[str(codigo), str(producto).upper(), precio]]
+            
+            # 4. Usamos update con el rango explícito
+            sheet.update(range_name=rango, values=valores, value_input_option='USER_ENTERED')
             return True
-    except:
+    except Exception as e:
+        st.error(f"Error al agregar producto: {e}")
         return False
 
 def borrar_producto_google(nombre_producto):
     try:
         sheet = conectar_google_sheets()
         if sheet:
-            # Buscamos específicamente en la Columna B (Producto) para no borrar filas equivocadas
-            # si el nombre coincide con un código de barras.
+            # Buscamos específicamente en la Columna B (Producto)
             celda = sheet.find(nombre_producto, in_column=2)
             if celda:
                 sheet.delete_rows(celda.row)
@@ -80,10 +87,11 @@ def editar_producto_google(nombre_original, nuevo_codigo, nuevo_nombre, nuevo_pr
             # Buscamos por el nombre original en la columna B
             celda = sheet.find(nombre_original, in_column=2)
             if celda:
-                # Actualización por celdas individuales garantizando la columna
-                sheet.update_cell(celda.row, 1, str(nuevo_codigo)) # Columna A
-                sheet.update_cell(celda.row, 2, str(nuevo_nombre).upper()) # Columna B
-                sheet.update_cell(celda.row, 3, nuevo_precio) # Columna C
+                # Actualización garantizando la columna física
+                # A=1, B=2, C=3
+                sheet.update_cell(celda.row, 1, str(nuevo_codigo))
+                sheet.update_cell(celda.row, 2, str(nuevo_nombre).upper())
+                sheet.update_cell(celda.row, 3, nuevo_precio)
                 return True
     except:
         return False
