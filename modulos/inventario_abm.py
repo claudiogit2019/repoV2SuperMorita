@@ -75,7 +75,6 @@ def mostrar_abm():
     # --- TAB 2: MODIFICACIÓN ---
     with tab2:
         st.subheader("Editar Producto Existente")
-        # Filtramos solo los que tengan nombre válido para el selectbox
         nombres_prod = sorted([str(p['Producto']) for p in inv if p.get('Producto')])
         seleccion = st.selectbox("Seleccione para modificar:", ["---"] + nombres_prod)
         
@@ -88,7 +87,6 @@ def mostrar_abm():
                     nuevo_nom = st.text_input("Nombre", value=str(prod_actual.get('Producto', ''))).upper().strip()
                     
                     try:
-                        # Limpieza de precio por si viene con formatos raros
                         p_val = str(prod_actual.get('Precio', 0)).replace(',', '.')
                         val_pre = float(p_val)
                     except:
@@ -126,12 +124,21 @@ def mostrar_abm():
     with tab4:
         st.subheader("Estado de Stock")
         if inv:
+            # 1. Creamos el DataFrame desde la lista de diccionarios
             df_inv = pd.DataFrame(inv)
-            # Reordenamos columnas para asegurar la vista A, B, C
-            columnas_ok = [c for c in ['Codigo', 'Producto', 'Precio'] if c in df_inv.columns]
-            df_display = df_inv[columnas_ok].sort_values(by="Producto")
             
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            # 2. FORZAMOS EL ORDEN Y EXISTENCIA DE COLUMNAS
+            # Si alguna columna no existe en el JSON, reindex la crea vacía.
+            columnas_fijas = ['Codigo', 'Producto', 'Precio']
+            df_display = df_inv.reindex(columns=columnas_fijas).fillna("").sort_values(by="Producto")
+            
+            # 3. Mostramos la tabla con las columnas en orden A, B, C
+            st.dataframe(
+                df_display, 
+                use_container_width=True, 
+                hide_index=True,
+                column_order=("Codigo", "Producto", "Precio") # Doble seguridad en el orden visual
+            )
             
             # Botón de exportación
             buffer = io.BytesIO()
